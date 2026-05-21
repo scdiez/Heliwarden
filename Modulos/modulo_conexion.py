@@ -18,10 +18,11 @@ import paho.mqtt.client as mqtt
 import requests
 from dotenv import load_dotenv
 
-# Permite importar desde el directorio raíz del proyecto
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# ── Paths basados en la ubicación de este archivo ─────────────────────────────
+MODULOS_DIR = Path(__file__).resolve().parent
+ROOT_DIR    = MODULOS_DIR.parent
 
-load_dotenv()
+load_dotenv(ROOT_DIR / ".env")
 
 # ── Configuración ─────────────────────────────────────────────────────────────
 
@@ -33,7 +34,6 @@ HTTP_PORT = int(os.getenv("CAMERA_HTTP_PORT", 88))
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT   = int(os.getenv("MQTT_PORT", 1883))
 
-# Intervalo de chequeo en segundos
 INTERVALO_CHECK = int(os.getenv("INTERVALO_CHECK_CONEXION", 5))
 
 HTTP_SNAP_URL = (
@@ -45,8 +45,8 @@ TOPIC_CONEXION = "heliwarden/conexion"
 
 # ── Estado ────────────────────────────────────────────────────────────────────
 
-_online         = True
-_t_desconexion  = None   # float: tiempo en que se detectó la caída
+_online        = True
+_t_desconexion = None
 
 
 # ── MQTT ──────────────────────────────────────────────────────────────────────
@@ -86,21 +86,18 @@ def _bucle(client: mqtt.Client) -> None:
         responde = _camara_responde()
 
         if responde and not _online:
-            # Recuperación
             _online        = True
             _t_desconexion = None
             print("✅ Cámara recuperada.")
             _publicar(client, online=True)
 
         elif not responde and _online:
-            # Primera caída
             _online        = False
             _t_desconexion = time.time()
             print("❌ Cámara no responde.")
             _publicar(client, online=False, segundos_caida=0)
 
         elif not responde and not _online:
-            # Sigue caída
             elapsed = int(time.time() - _t_desconexion)
             print(f"❌ Cámara sin señal: {elapsed}s")
             _publicar(client, online=False, segundos_caida=elapsed)

@@ -28,10 +28,14 @@ import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
 from onvif import ONVIFCamera
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# ── Paths basados en la ubicación de este archivo ─────────────────────────────
+MODULOS_DIR = Path(__file__).resolve().parent
+ROOT_DIR    = MODULOS_DIR.parent
+sys.path.insert(0, str(MODULOS_DIR))
+
 from captura_hd import guardar_captura_hd
 
-load_dotenv()
+load_dotenv(ROOT_DIR / ".env")
 
 # ── Configuración ─────────────────────────────────────────────────────────────
 
@@ -44,8 +48,7 @@ HTTP_PORT  = int(os.getenv("CAMERA_HTTP_PORT", 88))
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT   = int(os.getenv("MQTT_PORT", 1883))
 
-BASE_DIR  = Path(__file__).parent.parent
-CALIB_DIR = BASE_DIR / "calibracion"
+CALIB_DIR = ROOT_DIR / "calibracion"
 
 HTTP_SNAP_URL = (
     f"http://{IP}:{HTTP_PORT}/cgi-bin/CGIProxy.fcgi"
@@ -54,12 +57,11 @@ HTTP_SNAP_URL = (
 
 ONVIF_TIMEOUT = 5
 
-TOPIC_ESTADO  = "heliwarden/patrulla"          # publica resultados
-TOPIC_CMD     = "heliwarden/patrulla/cmd"       # escucha comandos
-TOPIC_CAPTURA = "heliwarden/patrulla/captura"   # notifica ruta de imagen lista
-TOPIC_ACK     = "heliwarden/deteccion/ack"      # recibe ACK de modulo_deteccion
+TOPIC_ESTADO  = "heliwarden/patrulla"
+TOPIC_CMD     = "heliwarden/patrulla/cmd"
+TOPIC_CAPTURA = "heliwarden/patrulla/captura"
+TOPIC_ACK     = "heliwarden/deteccion/ack"
 
-# Segundos máximos esperando el ACK de detección antes de continuar igualmente
 DETECCION_TIMEOUT = 90
 
 
@@ -80,16 +82,14 @@ class Patrullero:
             with open(config_path, "r") as f:
                 self.config = json.load(f)
 
-        self.last_p           = 0
-        self.patrulla_thread  = None
-        self.stop_event       = threading.Event()
-        self.indice_actual    = 0
-        self.reconectando     = False
-        self.fallos_precision  = {}   # {id_preset: int}
-        self.intentos_fallidos = {}   # {id_preset: int}
-        # Eventos de sincronización: el hilo de patrulla espera aquí
-        # hasta que modulo_deteccion publica el ACK del preset correspondiente.
-        self._ack_events: dict = {}   # {id_preset: threading.Event}
+        self.last_p            = 0
+        self.patrulla_thread   = None
+        self.stop_event        = threading.Event()
+        self.indice_actual     = 0
+        self.reconectando      = False
+        self.fallos_precision  = {}
+        self.intentos_fallidos = {}
+        self._ack_events: dict = {}
 
     # ── Publicación MQTT ──────────────────────────────────────────────────────
 
@@ -103,12 +103,10 @@ class Patrullero:
         self.client.publish(TOPIC_ESTADO, payload, qos=1)
 
     def _pub_captura(self, id_preset: int, ruta: str) -> None:
-        """Notifica que hay una imagen HD lista para que modulo_deteccion la analice."""
         payload = json.dumps({"preset": id_preset, "ruta": ruta})
         self.client.publish(TOPIC_CAPTURA, payload, qos=1)
 
     def notificar_ack(self, id_preset: int) -> None:
-        """Llamado desde _on_message cuando llega heliwarden/deteccion/ack."""
         ev = self._ack_events.get(id_preset)
         if ev is not None:
             ev.set()
@@ -116,8 +114,8 @@ class Patrullero:
     # ── PTZ helpers ──────────────────────────────────────────────────────────
 
     def _llamada_ptz(self, fn, *args, timeout=ONVIF_TIMEOUT):
-        resultado  = [None]
-        excepcion  = [None]
+        resultado = [None]
+        excepcion = [None]
 
         def _run():
             try:
@@ -238,10 +236,9 @@ class Patrullero:
         if plantilla is None:
             return False
 
-        # Búsqueda de referencia
-        encontrada    = False
-        pasos         = 0
-        max_pasos     = 12
+        encontrada = False
+        pasos      = 0
+        max_pasos  = 12
 
         while pasos < max_pasos:
             if self.stop_event.is_set():
@@ -274,17 +271,14 @@ class Patrullero:
                              fallos=self.fallos_precision[id_preset], razon="NO_REFERENCIA")
             return False
 
-        # Ajuste fino
         exito, razon = self.ajustar_af(mision)
 
         if exito:
-            prev_fallos = self.fallos_precision.get(id_preset, 0)
             self.fallos_precision[id_preset]  = 0
             self.intentos_fallidos[id_preset] = 0
             self.last_p = id_preset
             self._pub_estado(id_preset, ref_ok=True, fallos=0)
 
-            # Captura HD y espera activa a que modulo_deteccion termine el análisis
             ruta = guardar_captura_hd(id_preset)
             if ruta:
                 ev = threading.Event()
@@ -317,7 +311,6 @@ class Patrullero:
     # ── Espera de reconexión ──────────────────────────────────────────────────
 
     def _esperar_conexion(self) -> bool:
-        """Bloquea hasta que la cámara responda de nuevo."""
         if self.reconectando:
             return False
         self.reconectando = True
@@ -359,7 +352,6 @@ class Patrullero:
     def _bucle_worker(self) -> None:
         print("Iniciando patrulla...")
 
-        # Notificar a fusion que resetee todos los estados a "No analizado"
         self.client.publish(
             "heliwarden/patrulla/reset",
             json.dumps({"accion": "reset"}),
@@ -373,12 +365,7 @@ class Patrullero:
                 self.indice_actual = idx
                 if self.stop_event.is_set():
                     break
-
-                mision = self.config[idx]
-                if self.ejecutar_mision(mision):
-                    pass  # La espera ya ocurrió dentro de ejecutar_mision (ACK de detección)
-                else:
-                    self.ir_a_home()
+                self.ejecutar_mision(self.config[idx])
 
             self.indice_actual = 0
             print("Ciclo completo. Reiniciando...")
@@ -451,7 +438,6 @@ if __name__ == "__main__":
     client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
     client.loop_start()
 
-    # Inicializar el patrullero con el cliente MQTT ya conectado
     try:
         _patrullero = Patrullero(mqtt_client=client)
         print("✅ Patrullero inicializado. Esperando comandos...")

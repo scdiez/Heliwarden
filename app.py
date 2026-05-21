@@ -6,6 +6,7 @@ No contiene lógica de negocio, no mueve la cámara, no analiza imágenes.
 
 import json
 import os
+import sys
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -17,11 +18,13 @@ from flask import Flask, Response, jsonify, make_response, render_template
 import cv2
 import time
 
-# ── Configuración ─────────────────────────────────────────────────────────────
+# ── Paths basados en la ubicación de este archivo ─────────────────────────────
+ROOT_DIR    = Path(__file__).resolve().parent
+TEMPLATE_DIR = ROOT_DIR / "templates"
 
-load_dotenv()
-FILE_DIR = Path(__file__).parent
-DATA_FILE = FILE_DIR / "helipuertos.json"
+load_dotenv(ROOT_DIR / ".env")
+
+DATA_FILE = ROOT_DIR / "helipuertos.json"
 
 USER     = os.getenv("CAMERA_USER")
 PASS     = os.getenv("CAMERA_PASS")
@@ -31,7 +34,7 @@ RTSP_URL = f"rtsp://{USER}:{PASS}@{IP}:554/videoSub"
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT   = int(os.getenv("MQTT_PORT", 1883))
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=str(TEMPLATE_DIR))
 
 # ── Persistencia ──────────────────────────────────────────────────────────────
 
@@ -50,31 +53,21 @@ def save_data(data: dict) -> None:
             json.dump(data, f, indent=4, ensure_ascii=False)
 
 
-# ── MQTT: escucha comandos del frontend y reenvía logs al cliente ─────────────
-#
-# Topics que escucha app.py:
-#   heliwarden/cmd/patrulla  → {"accion": "iniciar" | "detener"}
-#
-# Topics que publica app.py:
-#   heliwarden/log           → {"nivel": "INFO"|"ALARM", "mensaje": "..."}
-#   (fusion_estados publica en heliwarden/log también; app.py solo retransmite
-#    al frontend vía polling /ptz/mensajes)
+# ── MQTT ──────────────────────────────────────────────────────────────────────
 
 _mensajes_pendientes: list = []
 _mqtt_lock = threading.Lock()
 
 def _on_mqtt_message(client, userdata, msg):
-    """Recibe mensajes MQTT destinados a app.py (logs de todos los módulos)."""
     try:
         payload = json.loads(msg.payload.decode())
-        topic = msg.topic
+        topic   = msg.topic
 
         if topic == "heliwarden/log":
             with _mqtt_lock:
                 _mensajes_pendientes.append(payload)
 
         elif topic == "heliwarden/cmd/patrulla":
-            # app.py reenvía el comando al módulo de patrulla republicándolo
             accion = payload.get("accion")
             if accion in ("iniciar", "detener"):
                 client.publish(
@@ -107,10 +100,10 @@ def _iniciar_mqtt():
 class VideoStream:
     def __init__(self, src: str):
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
-        self.src = src
-        self.cap = cv2.VideoCapture(src, cv2.CAP_FFMPEG)
-        self.frame = None
-        self.ret   = False
+        self.src     = src
+        self.cap     = cv2.VideoCapture(src, cv2.CAP_FFMPEG)
+        self.frame   = None
+        self.ret     = False
         self.stopped = False
 
     def start(self):
@@ -177,10 +170,6 @@ def video_feed(mode):
 
 @app.route("/ptz/<comando>")
 def control_ptz(comando):
-    """
-    Recibe comando del frontend y lo publica en MQTT.
-    El módulo de patrulla suscribe a heliwarden/patrulla/cmd y actúa.
-    """
     if comando == "patrulla":
         _mqtt_client.publish("heliwarden/patrulla/cmd", json.dumps({"accion": "iniciar"}), qos=1)
         return jsonify({"status": "Comando de inicio enviado"})
@@ -192,11 +181,9 @@ def control_ptz(comando):
 
 @app.route("/ptz/mensajes")
 def obtener_mensajes():
-    """Devuelve los mensajes de log recibidos por MQTT desde todos los módulos."""
     with _mqtt_lock:
         mensajes = _mensajes_pendientes.copy()
         _mensajes_pendientes.clear()
-    # Convertir al formato que ya espera el frontend: lista de strings con prefijo
     resultado = []
     for m in mensajes:
         nivel   = m.get("nivel", "INFO")

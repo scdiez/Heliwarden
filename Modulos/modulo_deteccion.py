@@ -30,52 +30,47 @@ import numpy as np
 import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# ── Paths basados en la ubicación de este archivo ─────────────────────────────
+MODULOS_DIR = Path(__file__).resolve().parent
+ROOT_DIR    = MODULOS_DIR.parent
 
-load_dotenv()
+load_dotenv(ROOT_DIR / ".env")
 
 # ── Configuración ─────────────────────────────────────────────────────────────
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT   = int(os.getenv("MQTT_PORT", 1883))
 
-BASE_DIR  = Path(__file__).parent.parent
-CALIB_DIR = BASE_DIR / "calibracion"
+CALIB_DIR = ROOT_DIR / "calibracion"
 
-MODELO_WORLD_PT = Path(os.getenv("YOLO_WORLD_MODEL", str(BASE_DIR.parent / "TESTUNIFICACION" / "yolov8l-worldv2.pt")))
-CONFIANZA       = float(os.getenv("YOLO_CONFIANZA_WORLD", 0.1))
-IOU_THR         = float(os.getenv("YOLO_IOU", 0.45))
-IMGSZ           = int(os.getenv("YOLO_IMGSZ", 640))
+MODELO_WORLD_PT = Path(os.getenv(
+    "YOLO_WORLD_MODEL",
+    str(ROOT_DIR.parent / "TESTUNIFICACION" / "yolov8l-worldv2.pt")
+))
+CONFIANZA = float(os.getenv("YOLO_CONFIANZA_WORLD", 0.1))
+IOU_THR   = float(os.getenv("YOLO_IOU", 0.45))
+IMGSZ     = int(os.getenv("YOLO_IMGSZ", 640))
 
-TOPIC_CAPTURA   = "heliwarden/patrulla/captura"   # escucha
-TOPIC_DETECCION = "heliwarden/deteccion"           # publica
+TOPIC_CAPTURA   = "heliwarden/patrulla/captura"
+TOPIC_DETECCION = "heliwarden/deteccion"
 
-# Imágenes de debug: máx 3 por preset
-DEBUG_DIR       = BASE_DIR / "debug_detecciones"
+DEBUG_DIR       = ROOT_DIR / "debug_detecciones"
 MAX_IMGS_PRESET = 3
 
 WORLD_CLASSES = [
-    # Personas
     "person", "employee", "visitor",
-    
-    # Mobiliario principal
     "desk", "office chair", "table", "bookshelf", "cabinet",
-    
-    # Tecnología
     "laptop", "computer monitor", "keyboard", "mouse", "phone",
     "printer", "projector", "water dispenser",
-    
-    # Objetos personales y papelería
     "notebook", "binder", "pen", "mug", "bottle",
     "backpack", "handbag", "trash can",
-    
-    # Cables y Seguridad
-    "cable", "power strip", "fire extinguisher", "wet floor sign"
+    "cable", "power strip", "fire extinguisher", "wet floor sign",
 ]
+
 # ── Estado global ─────────────────────────────────────────────────────────────
 
 _world_model    = None
-_config_presets: dict = {}   # {id_preset: {"roi": [...], ...}}
+_config_presets: dict = {}
 
 
 # ── Carga de modelo y config ──────────────────────────────────────────────────
@@ -99,7 +94,6 @@ def _load_model() -> None:
 
 
 def _load_config() -> None:
-    """Carga calibracion/config.json para obtener ROIs por preset."""
     global _config_presets
     config_path = CALIB_DIR / "config.json"
     if not config_path.exists():
@@ -154,7 +148,6 @@ def _guardar_debug_imagen(id_preset: int, image: np.ndarray, dets: list) -> None
         filepath  = DEBUG_DIR / f"preset{id_preset}_{timestamp}.jpg"
         cv2.imwrite(str(filepath), out, [cv2.IMWRITE_JPEG_QUALITY, 85])
 
-        # Conservar solo las más recientes
         existentes = sorted(
             DEBUG_DIR.glob(f"preset{id_preset}_*.jpg"),
             key=lambda p: p.stat().st_mtime,
@@ -170,10 +163,6 @@ def _guardar_debug_imagen(id_preset: int, image: np.ndarray, dets: list) -> None
 # ── Pipeline de análisis ──────────────────────────────────────────────────────
 
 def analizar_imagen(id_preset: int, ruta_imagen: str) -> list:
-    """
-    Corre YOLOWorld sobre la imagen completa con ROI opcional.
-    Devuelve lista de dicts: {clase, cx, cy, confianza}
-    """
     print(f"\n🔍 Analizando preset {id_preset}: {ruta_imagen}")
 
     image = cv2.imread(ruta_imagen)
@@ -185,13 +174,11 @@ def analizar_imagen(id_preset: int, ruta_imagen: str) -> list:
         print("  ❌ Modelo no cargado.")
         return []
 
-    # ROI del preset (opcional)
     roi_mask: Optional[np.ndarray] = None
     roi_poly = _config_presets.get(id_preset, {}).get("roi")
     if roi_poly:
         roi_mask = _make_roi_mask(image.shape[:2], roi_poly)
 
-    # Inferencia sobre imagen completa
     try:
         results = _world_model.predict(
             image,
@@ -204,7 +191,7 @@ def analizar_imagen(id_preset: int, ruta_imagen: str) -> list:
         print(f"  ❌ Error en inferencia: {e}")
         return []
 
-    dets = []
+    dets  = []
     names = _world_model.names
     for r in results:
         if r.boxes is None:
@@ -253,9 +240,6 @@ def _on_connect(client, userdata, flags, rc):
 
 
 def _on_message(client, userdata, msg):
-    """
-    Payload esperado: {"preset": int, "ruta": str}
-    """
     try:
         payload   = json.loads(msg.payload.decode())
         id_preset = payload.get("preset")
@@ -272,7 +256,7 @@ def _on_message(client, userdata, msg):
 
         client.publish("heliwarden/deteccion/ack",
                        json.dumps({"preset": id_preset}), qos=1)
-        
+
     except Exception as e:
         print(f"[modulo_deteccion] Error procesando captura: {e}")
 
