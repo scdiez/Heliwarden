@@ -43,10 +43,7 @@ MQTT_PORT   = int(os.getenv("MQTT_PORT", 1883))
 
 CALIB_DIR = ROOT_DIR / "calibracion"
 
-MODELO_WORLD_PT = Path(os.getenv(
-    "YOLO_WORLD_MODEL",
-    str(ROOT_DIR.parent / "TESTUNIFICACION" / "yolov8l-worldv2.pt")
-))
+MODELO_WORLD_PT = ROOT_DIR / "Datos" / "YOLO" / "yolov8l-worldv2.pt"
 CONFIANZA = float(os.getenv("YOLO_CONFIANZA_WORLD", 0.1))
 IOU_THR   = float(os.getenv("YOLO_IOU", 0.45))
 IMGSZ     = int(os.getenv("YOLO_IMGSZ", 640))

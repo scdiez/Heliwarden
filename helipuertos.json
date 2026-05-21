@@ -1,4 +1,106 @@
 {
-    "config": {},
-    "logs": []
+    "config": {
+        "1": {
+            "nombre": "H-01",
+            "plataforma": {
+                "visibilidad": "Buena",
+                "estado": "Despejado",
+                "estacionamiento": "EC-034 (22/04/27 19:03)",
+                "rango": 2,
+                "ocupacion": "Despejado",
+                "detecciones": []
+            },
+            "rutas": {
+                "ruta_1": {
+                    "visibilidad": "Buena",
+                    "estado": "Despejado",
+                    "rango": 2,
+                    "ocupacion": "Despejado",
+                    "detecciones": []
+                },
+                "ruta_2": {
+                    "visibilidad": "Buena",
+                    "estado": "Despejado",
+                    "rango": 2,
+                    "ocupacion": "Despejado",
+                    "detecciones": []
+                }
+            },
+            "infraestructura": [
+                {
+                    "item": "Balizas",
+                    "info": "Operativas",
+                    "rango": 2
+                },
+                {
+                    "item": "Pintura",
+                    "info": "Buen estado",
+                    "rango": 2
+                },
+                {
+                    "item": "Manga de viento",
+                    "info": "Necesita reparación",
+                    "rango": 4
+                }
+            ],
+            "visibilidad_metrica": "3000m"
+        },
+        "2": {
+            "nombre": "H-02",
+            "plataforma": {
+                "visibilidad": "Buena",
+                "estado": "Despejado",
+                "estacionamiento": "EC-032 (22/04/27 18:07)",
+                "rango": 2,
+                "detecciones": [],
+                "ocupacion": "Despejado"
+            },
+            "rutas": {
+                "ruta_1": {
+                    "visibilidad": "Mala",
+                    "estado": "No evaluable",
+                    "rango": 2,
+                    "detecciones": [],
+                    "ocupacion": "Despejado"
+                },
+                "ruta_2": {
+                    "visibilidad": "Buena",
+                    "estado": "Despejada",
+                    "rango": 2,
+                    "detecciones": [],
+                    "ocupacion": "Despejado"
+                }
+            },
+            "infraestructura": [
+                {
+                    "item": "Balizas",
+                    "info": "Necesita reparación",
+                    "rango": 4
+                },
+                {
+                    "item": "Pintura",
+                    "info": "Buen estado",
+                    "rango": 2
+                },
+                {
+                    "item": "Manga de viento",
+                    "info": "Buen estado",
+                    "rango": 2
+                }
+            ],
+            "visibilidad_metrica": "2000m"
+        }
+    },
+    "logs": [
+        {
+            "timestamp": "2026-05-19 10:58:58",
+            "nivel": "INFO",
+            "mensaje": "PTZ: Patrulla iniciada"
+        },
+        {
+            "timestamp": "2026-05-19 10:59:29",
+            "nivel": "INFO",
+            "mensaje": "PTZ: Patrulla detenida"
+        }
+    ]
 }
