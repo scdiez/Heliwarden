@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Helipuertos - Control PTZ</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9;
+            display: grid; grid-template-columns: 280px 1fr;
+            height: 100vh; width: 100vw; overflow: hidden;
+        }
+
+        .rango-1 { color: #ffffff; font-weight: bold; }
+        .rango-2 { color: #3fb950; font-weight: bold; }
+        .rango-3 { color: #d29922; font-weight: bold; }
+        .rango-4 { color: #f85149; font-weight: bold; }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            grid-template-rows: 1fr 240px;
+            gap: 12px; padding: 8px 12px; height: 100vh;
+        }
+
+        .panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; overflow: hidden; height: 100%; }
+        .panel-header { border-bottom: 1px solid #333; margin-bottom: 15px; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        h2 { font-size: 1.15rem; color: #58a6ff; text-transform: uppercase; letter-spacing: 1.5px; }
+
+        .video-container { grid-column: 1; grid-row: 1; background: #000; position: relative; }
+        .video-container img { width: 100%; height: 100%; object-fit: contain; }
+
+        .btn-video { background: #21262d; border: 1px solid #444; color: #c9d1d9; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
+        .btn-video:hover { background: #30363d; }
+        .btn-video.active { background: #238636; color: white; border-color: #2ea043; }
+
+        .bottom-left-group { grid-column: 1; grid-row: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .inner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .full-width-item { grid-column: span 2; }
+
+        .data-item { margin-bottom: 12px; }
+        .label-full { color: #8b949e; font-size: 0.9rem; display: block; text-transform: uppercase; margin-bottom: 4px; }
+        .value-text, .infra-val { font-size: 1.2rem; }
+
+        .big-vis { font-size: 5rem; font-weight: bold; text-align: center; margin: auto 0; color: #f0f6fc; }
+        .sidebar { background: #161b22; border-right: 1px solid #30363d; padding: 25px; height: 100%; }
+        .heli-btn { width: 100%; background: #21262d; border: 1px solid #30363d; color: white; padding: 18px; margin-bottom: 10px; border-radius: 8px; cursor: pointer; text-align: left; font-size: 1.1rem; }
+        .heli-btn.active { border-color: #238636; background: #238636; }
+        #log-box { flex-grow: 1; overflow-y: auto; font-size: 0.95rem; font-family: 'Consolas', monospace; color: #8b949e; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="panel-header"><h2>Helipuertos</h2></div>
+        <div id="sidebar-helipuertos" style="overflow-y: auto;"></div>
+    </div>
+
+    <div class="main-layout">
+        <div class="video-container panel">
+            <!-- Botones de calidad -->
+            <div style="position: absolute; top: 20px; right: 20px; z-index: 10; display: flex; gap: 10px;">
+                <button id="btn-hq" class="btn-video" onclick="setVideoMode('hq')">ALTA CALIDAD</button>
+                <button id="btn-lq" class="btn-video active" onclick="setVideoMode('lq')">TIEMPO REAL</button>
+            </div>
+
+            <!-- Control de patrulla -->
+            <div style="position: absolute; bottom: 20px; left: 20px; z-index: 10; display: flex; gap: 10px; background: rgba(13, 17, 23, 0.7); padding: 10px; border-radius: 8px; border: 1px solid #30363d;">
+                <button id="btn-patrulla" class="btn-video" onclick="togglePatrulla()">PATRULLA CONTINUA</button>
+            </div>
+
+            <img id="video-stream" src="{{ url_for('video_feed', mode='lq') }}">
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Registro</h2>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-video" onclick="window.location.href='/export_logs'">EXPORTAR</button>
+                    <button class="btn-video" onclick="clearLogs()">LIMPIAR</button>
+                </div>
+            </div>
+            <div id="log-box">
+                {% for log in logs %}
+                    <div>
+                        <span style="color:#58a6ff">[{{ log.timestamp }}]</span>
+                        {% if log.nivel == 'ALARM' %}
+                            <span style="color:#f85149; font-weight:bold;">[{{ log.nivel }}]</span>
+                        {% else %}
+                            <span style="color:#3fb950;">[{{ log.nivel }}]</span>
+                        {% endif %}
+                        {{ log.mensaje }}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bottom-left-group">
+            <div class="panel">
+                <div class="panel-header"><h2>Plataforma</h2></div>
+                <div class="inner-grid">
+                    <div>
+                        <div class="data-item"><span class="label-full">Visibilidad</span><span id="plat-vis" class="value-text">-</span></div>
+                        <div class="data-item"><span class="label-full">Ocupación</span><span id="plat-est" class="value-text">-</span></div>
+                    </div>
+                    <div><div class="data-item"><span class="label-full">Estacionamiento</span><span id="plat-parking" class="value-text" style="font-size:0.9rem">-</span></div></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><h2>Rutas</h2></div>
+                <div class="inner-grid">
+                    <div>
+                        <strong style="font-size:0.8rem; color:#58a6ff; display:block; margin-bottom:8px">RUTA 1</strong>
+                        <div class="data-item"><span class="label-full">Visibilidad</span><span id="r1-vis" class="value-text">-</span></div>
+                        <div class="data-item"><span class="label-full">Ocupación</span><span id="r1-est" class="value-text">-</span></div>
+                    </div>
+                    <div>
+                        <strong style="font-size:0.8rem; color:#58a6ff; display:block; margin-bottom:8px">RUTA 2</strong>
+                        <div class="data-item"><span class="label-full">Visibilidad</span><span id="r2-vis" class="value-text">-</span></div>
+                        <div class="data-item"><span class="label-full">Ocupación</span><span id="r2-est" class="value-text">-</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><h2>Infraestructura</h2></div>
+                <div id="infra-list" class="inner-grid"></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header"><h2>Visibilidad</h2></div>
+            <div id="vis-metrica" class="big-vis">0m</div>
+        </div>
+    </div>
+
+    <script>
+        let patrullaActiva = false;
+        let heliActivoId = null;
+
+        // --- Sidebar: única fuente de verdad, generada por JS ---
+        function renderSidebar(config) {
+            const sidebar = document.getElementById('sidebar-helipuertos');
+            const ids = Object.keys(config);
+            // Primera carga: seleccionar el primero automáticamente
+            if (heliActivoId === null && ids.length > 0) {
+                heliActivoId = ids[0];
+            }
+            sidebar.innerHTML = '';
+            ids.forEach(id => {
+                const btn = document.createElement('button');
+                btn.className = 'heli-btn' + (id === heliActivoId ? ' active' : '');
+                btn.innerText = config[id].nombre;
+                btn.onclick = () => {
+                    heliActivoId = id;
+                    document.querySelectorAll('.heli-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    renderDatos(config[id]);
+                };
+                sidebar.appendChild(btn);
+            });
+        }
+
+        function renderDatos(data) {
+            document.getElementById('plat-vis').innerText = data.plataforma.visibilidad;
+            const pEst = document.getElementById('plat-est');
+            pEst.innerText = data.plataforma.ocupacion;
+            pEst.className = 'value-text ' + getColorClass(data.plataforma.rango);
+            document.getElementById('plat-parking').innerText = data.plataforma.estacionamiento;
+
+            document.getElementById('r1-vis').innerText = data.rutas.ruta_1.visibilidad;
+            const r1E = document.getElementById('r1-est');
+            r1E.innerText = data.rutas.ruta_1.ocupacion;
+            r1E.className = 'value-text ' + getColorClass(data.rutas.ruta_1.rango);
+
+            document.getElementById('r2-vis').innerText = data.rutas.ruta_2.visibilidad;
+            const r2E = document.getElementById('r2-est');
+            r2E.innerText = data.rutas.ruta_2.ocupacion;
+            r2E.className = 'value-text ' + getColorClass(data.rutas.ruta_2.rango);
+
+            let htmlInfra = '';
+            data.infraestructura.forEach(i => {
+                const isManga = i.item.toLowerCase().includes('manga');
+                htmlInfra += `<div class="data-item ${isManga ? 'full-width-item' : ''}">
+                    <span class="label-full">${i.item}</span>
+                    <span class="infra-val ${getColorClass(i.rango)}">${i.info}</span>
+                </div>`;
+            });
+            document.getElementById('infra-list').innerHTML = htmlInfra;
+            document.getElementById('vis-metrica').innerText = data.visibilidad_metrica;
+        }
+
+        // Recarga helipuertos.json y refresca sidebar + datos del activo
+        function refrescarHelipuertos() {
+            fetch('/helipuertos')
+                .then(res => res.json())
+                .then(config => {
+                    renderSidebar(config);
+                    if (heliActivoId && config[heliActivoId]) {
+                        renderDatos(config[heliActivoId]);
+                    }
+                })
+                .catch(() => {});
+        }
+
+        function togglePatrulla() {
+            patrullaActiva = !patrullaActiva;
+            const btn = document.getElementById('btn-patrulla');
+            if (patrullaActiva) {
+                btn.classList.add('active');
+                btn.innerText = "DETENER PATRULLA";
+                enviarComandoPTZ('patrulla');
+            } else {
+                btn.classList.remove('active');
+                btn.innerText = "PATRULLA CONTINUA";
+                enviarComandoPTZ('stop');
+            }
+        }
+
+        function enviarComandoPTZ(comando) {
+            fetch('/ptz/' + comando)
+                .then(res => res.json())
+                .then(data => appendLog('INFO', data.status))
+                .catch(err => console.error("Error en mando PTZ:", err));
+        }
+
+        function getColorClass(rango) { return 'rango-' + (rango || 1); }
+
+        function setVideoMode(mode) {
+            document.getElementById('video-stream').src = '/video_feed/' + mode + '?t=' + new Date().getTime();
+            document.querySelectorAll('.btn-video').forEach(b => {
+                if (b.id === 'btn-hq' || b.id === 'btn-lq') b.classList.remove('active');
+            });
+            document.getElementById(mode === 'hq' ? 'btn-hq' : 'btn-lq').classList.add('active');
+        }
+
+        function clearLogs() {
+            if (confirm("¿Borrar permanentemente?")) {
+                fetch('/clear_logs', { method: 'POST' })
+                    .then(() => { document.getElementById('log-box').innerHTML = ''; });
+            }
+        }
+
+        function nowTimestamp() {
+            const d = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ` +
+                   `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        function appendLog(nivel, texto) {
+            const lb = document.getElementById('log-box');
+            const ts = nowTimestamp();
+            if (nivel === 'ALARM') {
+                lb.innerHTML += `<div><span style="color:#f85149; font-weight:900; background-color:rgba(248,81,73,0.1); padding:2px;">[${ts}] [ALARM] ${texto.toUpperCase()}</span></div>`;
+            } else {
+                lb.innerHTML += `<div><span style="color:#58a6ff">[${ts}]</span> <span style="color:#3fb950;">[INFO]</span> ${texto}</div>`;
+            }
+            lb.scrollTop = lb.scrollHeight;
+        }
+
+        // Carga inicial
+        document.addEventListener('DOMContentLoaded', () => {
+            refrescarHelipuertos();
+        });
+
+        // Mensajes PTZ cada 3 s
+        setInterval(() => {
+            fetch('/ptz/mensajes')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.mensajes && data.mensajes.length > 0) {
+                        data.mensajes.forEach(msg => {
+                            if (msg.includes('[ALARM]')) {
+                                appendLog('ALARM', msg.replace('[ALARM]', '').trim());
+                            } else {
+                                appendLog('INFO', msg.replace('[INFO]', '').trim());
+                            }
+                        });
+                    }
+                })
+                .catch(err => console.error("Error consultando mensajes:", err));
+        }, 3000);
+
+        // Auto-refresh de helipuertos.json cada 10 s
+        setInterval(refrescarHelipuertos, 10000);
+    </script>
+</body>
+</html>
