@@ -1,15 +1,4 @@
 {
     "config": {},
-    "logs": [
-        {
-            "timestamp": "2026-05-21 13:37:56",
-            "nivel": "ALARM",
-            "mensaje": "Conexión perdida con la cámara"
-        },
-        {
-            "timestamp": "2026-05-21 13:38:33",
-            "nivel": "ALARM",
-            "mensaje": "CÁMARA DESCONECTADA: sin señal durante 37s"
-        }
-    ]
+    "logs": []
 }
