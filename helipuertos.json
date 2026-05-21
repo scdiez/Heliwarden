@@ -12,10 +12,10 @@
             },
             "rutas": {
                 "ruta_1": {
-                    "visibilidad": "Buena",
+                    "visibilidad": "No analizado",
                     "estado": "Despejado",
-                    "rango": 2,
-                    "ocupacion": "Despejado",
+                    "rango": 1,
+                    "ocupacion": "No analizado",
                     "detecciones": []
                 },
                 "ruta_2": {
@@ -48,27 +48,27 @@
         "2": {
             "nombre": "H-02",
             "plataforma": {
-                "visibilidad": "Buena",
+                "visibilidad": "No analizado",
                 "estado": "Despejado",
                 "estacionamiento": "EC-032 (22/04/27 18:07)",
-                "rango": 2,
+                "rango": 1,
                 "detecciones": [],
-                "ocupacion": "Despejado"
+                "ocupacion": "No analizado"
             },
             "rutas": {
                 "ruta_1": {
-                    "visibilidad": "Mala",
+                    "visibilidad": "No analizado",
                     "estado": "No evaluable",
-                    "rango": 2,
+                    "rango": 1,
                     "detecciones": [],
-                    "ocupacion": "Despejado"
+                    "ocupacion": "No analizado"
                 },
                 "ruta_2": {
-                    "visibilidad": "Buena",
+                    "visibilidad": "No analizado",
                     "estado": "Despejada",
-                    "rango": 2,
+                    "rango": 1,
                     "detecciones": [],
-                    "ocupacion": "Despejado"
+                    "ocupacion": "No analizado"
                 }
             },
             "infraestructura": [
@@ -101,6 +101,66 @@
             "timestamp": "2026-05-19 10:59:29",
             "nivel": "INFO",
             "mensaje": "PTZ: Patrulla detenida"
+        },
+        {
+            "timestamp": "2026-05-21 13:53:48",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-21 13:54:23",
+            "nivel": "ALARM",
+            "mensaje": "CÁMARA DESCONECTADA: sin señal durante 160s"
+        },
+        {
+            "timestamp": "2026-05-21 13:54:53",
+            "nivel": "INFO",
+            "mensaje": "Conexión con la cámara recuperada"
+        },
+        {
+            "timestamp": "2026-05-21 13:55:27",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-21 13:55:27",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-21 13:55:57",
+            "nivel": "ALARM",
+            "mensaje": "Conexión perdida con la cámara"
+        },
+        {
+            "timestamp": "2026-05-21 13:56:29",
+            "nivel": "ALARM",
+            "mensaje": "CÁMARA DESCONECTADA: sin señal durante 32s"
+        },
+        {
+            "timestamp": "2026-05-21 13:57:23",
+            "nivel": "INFO",
+            "mensaje": "Conexión con la cámara recuperada"
+        },
+        {
+            "timestamp": "2026-05-21 13:58:16",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P2 (NO_REFERENCIA) — intento 1"
+        },
+        {
+            "timestamp": "2026-05-21 13:58:35",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-21 13:58:35",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-21 13:59:41",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
         }
     ]
 }
