@@ -2,7 +2,7 @@
 start.py — Arranca el sistema Heliwarden completo.
 
 Orden de arranque:
-  1. Broker Mosquitto (si no está ya corriendo)
+  1. Broker MQTT (comprueba el configurado en .env; arranca Mosquitto local solo si es localhost)
   2. fusion_estados.py
   3. Modulos/modulo_conexion.py
   4. Modulos/modulo_patrulla.py
@@ -21,11 +21,17 @@ import sys
 import time
 import os
 import signal
+import socket
 from pathlib import Path
+from dotenv import load_dotenv
 
-# ── Paths basados en la ubicación de este archivo ─────────────────────────────
 ROOT_DIR = Path(__file__).resolve().parent
 PYTHON   = sys.executable
+
+load_dotenv(ROOT_DIR / ".env")
+
+MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
+MQTT_PORT   = int(os.getenv("MQTT_PORT", 1883))
 
 ESPERA_ENTRE_PROCESOS = 2
 
@@ -41,18 +47,28 @@ def _arrancar(nombre: str, script: Path, extra_args: list = None) -> subprocess.
     return p
 
 
-def _esta_mosquitto_corriendo() -> bool:
-    import socket
+def _broker_responde(host: str, port: int) -> bool:
     try:
-        with socket.create_connection(("localhost", 1883), timeout=1):
+        with socket.create_connection((host, port), timeout=2):
             return True
     except OSError:
         return False
 
 
 def _arrancar_mosquitto() -> subprocess.Popen | None:
-    if _esta_mosquitto_corriendo():
-        print("  ✅ Mosquitto ya está corriendo en localhost:1883")
+    """Solo intenta arrancar Mosquitto si el broker configurado es localhost."""
+    if MQTT_BROKER not in ("localhost", "127.0.0.1"):
+        # Broker remoto — no intentamos arrancar nada local
+        if _broker_responde(MQTT_BROKER, MQTT_PORT):
+            print(f"  ✅ Broker MQTT remoto disponible en {MQTT_BROKER}:{MQTT_PORT}")
+        else:
+            print(f"  ❌ No se puede conectar al broker MQTT en {MQTT_BROKER}:{MQTT_PORT}")
+            print(f"     Comprueba que el broker está activo y accesible.")
+        return None
+
+    # Broker local — comportamiento original
+    if _broker_responde("localhost", MQTT_PORT):
+        print(f"  ✅ Mosquitto ya está corriendo en localhost:{MQTT_PORT}")
         return None
 
     print("  ▶ Intentando arrancar Mosquitto...")
@@ -66,7 +82,7 @@ def _arrancar_mosquitto() -> subprocess.Popen | None:
             p = subprocess.Popen(["mosquitto", "-v"])
         procesos.append(p)
         time.sleep(2)
-        if _esta_mosquitto_corriendo():
+        if _broker_responde("localhost", MQTT_PORT):
             print("  ✅ Mosquitto arrancado.")
         else:
             print("  ⚠️  Mosquitto no respondió. ¿Está instalado?")
@@ -111,9 +127,8 @@ def main():
 
     _arrancar_mosquitto()
 
-    if not _esta_mosquitto_corriendo():
-        print("\n❌ No se puede continuar sin el broker MQTT.")
-        print("   Arranca Mosquitto manualmente y vuelve a ejecutar start.py")
+    if not _broker_responde(MQTT_BROKER, MQTT_PORT):
+        print(f"\n❌ No se puede continuar sin el broker MQTT en {MQTT_BROKER}:{MQTT_PORT}.")
         sys.exit(1)
 
     _arrancar("fusion_estados",   ROOT_DIR / "fusion_estados.py")
@@ -128,6 +143,7 @@ def main():
     _arrancar("app (Flask)", ROOT_DIR / "app.py")
 
     print("\n✅ Sistema completo arrancado.")
+    print(f"   Broker MQTT → {MQTT_BROKER}:{MQTT_PORT}")
     print("   Dashboard → http://localhost:5000")
     print("   Ctrl+C para parar todo.\n")
 

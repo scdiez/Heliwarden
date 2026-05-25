@@ -31,8 +31,8 @@ PASS      = os.getenv("CAMERA_PASS")
 IP        = os.getenv("CAMERA_IP")
 HTTP_PORT = int(os.getenv("CAMERA_HTTP_PORT", 88))
 
-MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
-MQTT_PORT   = int(os.getenv("MQTT_PORT", 1883))
+MQTT_BROKER = os.getenv("MQTT_BROKER")
+MQTT_PORT   = int(os.getenv("MQTT_PORT"))
 
 INTERVALO_CHECK = int(os.getenv("INTERVALO_CHECK_CONEXION", 5))
 

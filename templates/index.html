@@ -47,6 +47,75 @@
         .heli-btn { width: 100%; background: #21262d; border: 1px solid #30363d; color: white; padding: 18px; margin-bottom: 10px; border-radius: 8px; cursor: pointer; text-align: left; font-size: 1.1rem; }
         .heli-btn.active { border-color: #238636; background: #238636; }
         #log-box { flex-grow: 1; overflow-y: auto; font-size: 0.95rem; font-family: 'Consolas', monospace; color: #8b949e; }
+
+        /* ── Calibración ── */
+        .calib-overlay {
+            display: none; position: fixed; inset: 0; z-index: 100;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+            align-items: center; justify-content: center;
+        }
+        .calib-overlay.visible { display: flex; }
+        .calib-panel {
+            background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+            width: 900px; max-width: 95vw; max-height: 92vh;
+            display: grid; grid-template-columns: 1fr 340px; gap: 0; overflow: hidden;
+        }
+        .calib-video-wrap {
+            position: relative; background: #000; min-height: 400px;
+            cursor: crosshair; user-select: none;
+        }
+        .calib-video-wrap img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        .calib-svg-overlay {
+            position: absolute; inset: 0; pointer-events: none;
+        }
+        .calib-drag-rect {
+            position: absolute; border: 2px dashed #f0b429; pointer-events: none;
+            display: none;
+        }
+        .calib-sidebar {
+            border-left: 1px solid #30363d; display: flex; flex-direction: column;
+            padding: 18px; gap: 12px; overflow: hidden;
+        }
+        .calib-title {
+            font-size: 1rem; font-weight: bold; color: #58a6ff;
+            text-transform: uppercase; letter-spacing: 1px;
+            border-bottom: 1px solid #30363d; padding-bottom: 10px;
+        }
+        .calib-progress {
+            font-size: 0.8rem; color: #8b949e;
+        }
+        .calib-log {
+            flex-grow: 1; overflow-y: auto; font-size: 0.82rem;
+            font-family: 'Consolas', monospace; color: #8b949e;
+            background: #0d1117; border-radius: 6px; padding: 10px;
+            border: 1px solid #21262d;
+        }
+        .calib-log .inst { color: #f0b429; font-weight: bold; }
+        .calib-log .ok   { color: #3fb950; }
+        .calib-log .err  { color: #f85149; }
+        .calib-controls { display: flex; flex-direction: column; gap: 8px; }
+        .calib-row { display: flex; gap: 8px; }
+        .btn-calib {
+            flex: 1; background: #21262d; border: 1px solid #444; color: #c9d1d9;
+            padding: 9px 6px; border-radius: 6px; cursor: pointer;
+            font-weight: bold; font-size: 0.82rem; text-align: center;
+        }
+        .btn-calib:hover  { background: #30363d; }
+        .btn-calib.confirm { background: #238636; border-color: #2ea043; color: #fff; }
+        .btn-calib.confirm:hover { background: #2ea043; }
+        .btn-calib.danger  { background: #6e1e1e; border-color: #f85149; color: #f85149; }
+        .btn-calib.danger:hover  { background: #8b2525; }
+        .btn-calib:disabled { opacity: 0.35; cursor: not-allowed; }
+        .calib-phase-badge {
+            display: inline-block; padding: 3px 10px; border-radius: 20px;
+            font-size: 0.75rem; font-weight: bold; text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .phase-posicion { background: #1c3a5e; color: #58a6ff; }
+        .phase-roi      { background: #2d4a1e; color: #3fb950; }
+        .phase-ancla    { background: #4a3300; color: #f0b429; }
+        .phase-done     { background: #1e3a2d; color: #3fb950; }
+        .phase-idle     { background: #21262d; color: #8b949e; }
     </style>
 </head>
 <body>
@@ -67,6 +136,7 @@
             <!-- Control de patrulla -->
             <div style="position: absolute; bottom: 20px; left: 20px; z-index: 10; display: flex; gap: 10px; background: rgba(13, 17, 23, 0.7); padding: 10px; border-radius: 8px; border: 1px solid #30363d;">
                 <button id="btn-patrulla" class="btn-video" onclick="togglePatrulla()">PATRULLA CONTINUA</button>
+                <button class="btn-video" onclick="abrirCalibracion()" style="border-color:#f0b429; color:#f0b429;">⚙ CALIBRAR</button>
             </div>
 
             <img id="video-stream" src="{{ url_for('video_feed', mode='lq') }}">
@@ -254,6 +324,10 @@
             const ts = nowTimestamp();
             if (nivel === 'ALARM') {
                 lb.innerHTML += `<div><span style="color:#f85149; font-weight:900; background-color:rgba(248,81,73,0.1); padding:2px;">[${ts}] [ALARM] ${texto.toUpperCase()}</span></div>`;
+            } else if (nivel === 'CALIB') {
+                lb.innerHTML += `<div><span style="color:#f0b429; font-weight:bold;">[${ts}] [CALIB]</span> ${texto}</div>`;
+                // También al log de calibración si el panel está abierto
+                calibLog('CALIB', texto);
             } else {
                 lb.innerHTML += `<div><span style="color:#58a6ff">[${ts}]</span> <span style="color:#3fb950;">[INFO]</span> ${texto}</div>`;
             }
@@ -274,6 +348,8 @@
                         data.mensajes.forEach(msg => {
                             if (msg.includes('[ALARM]')) {
                                 appendLog('ALARM', msg.replace('[ALARM]', '').trim());
+                            } else if (msg.includes('[CALIB]')) {
+                                appendLog('CALIB', msg.replace('[CALIB]', '').trim());
                             } else {
                                 appendLog('INFO', msg.replace('[INFO]', '').trim());
                             }
@@ -286,5 +362,312 @@
         // Auto-refresh de helipuertos.json cada 10 s
         setInterval(refrescarHelipuertos, 10000);
     </script>
+    <!-- ══ PANEL DE CALIBRACIÓN ══ -->
+    <div class="calib-overlay" id="calib-overlay">
+        <div class="calib-panel">
+
+            <!-- Vídeo con overlay SVG para ROI y ancla -->
+            <div class="calib-video-wrap" id="calib-video-wrap">
+                <img id="calib-stream" src="" alt="stream">
+                <svg class="calib-svg-overlay" id="calib-svg" viewBox="0 0 640 360" preserveAspectRatio="none"></svg>
+                <div class="calib-drag-rect" id="calib-drag-rect"></div>
+            </div>
+
+            <!-- Sidebar de controles -->
+            <div class="calib-sidebar">
+                <div class="calib-title">⚙ Calibración</div>
+
+                <div>
+                    <span id="calib-phase-badge" class="calib-phase-badge phase-idle">Idle</span>
+                    <span class="calib-progress" id="calib-progress"></span>
+                </div>
+
+                <div class="calib-log" id="calib-log"></div>
+
+                <!-- Fase: POSICIÓN -->
+                <div class="calib-controls" id="ctrl-posicion" style="display:none">
+                    <div class="calib-row">
+                        <button class="btn-calib" onclick="calibCmd('mover_izq')" id="btn-izq">◀ A — Izquierda</button>
+                        <button class="btn-calib" onclick="calibCmd('mover_der')" id="btn-der">D — Derecha ▶</button>
+                    </div>
+                    <button class="btn-calib confirm" onclick="calibCmd('confirmar')">✔ CONFIRMAR POSICIÓN</button>
+                </div>
+
+                <!-- Fase: ROI -->
+                <div class="calib-controls" id="ctrl-roi" style="display:none">
+                    <div style="font-size:0.78rem; color:#8b949e;">
+                        Haz clic sobre el vídeo para marcar los vértices del área de vigilancia.
+                    </div>
+                    <div class="calib-row">
+                        <button class="btn-calib" onclick="calibCmd('roi_deshacer')">↩ Deshacer</button>
+                        <button class="btn-calib confirm" onclick="calibCmd('confirmar')">✔ CONFIRMAR ROI</button>
+                    </div>
+                </div>
+
+                <!-- Fase: ANCLAJE -->
+                <div class="calib-controls" id="ctrl-ancla" style="display:none">
+                    <div style="font-size:0.78rem; color:#8b949e;">
+                        Haz clic y arrastra sobre el vídeo para seleccionar la referencia fija (parasol).
+                    </div>
+                    <button class="btn-calib confirm" onclick="calibCmd('confirmar')">✔ CONFIRMAR ANCLAJE</button>
+                </div>
+
+                <!-- Fase: DONE -->
+                <div class="calib-controls" id="ctrl-done" style="display:none">
+                    <div style="color:#3fb950; font-size:0.9rem; text-align:center;">
+                        🎉 Calibración completada
+                    </div>
+                </div>
+
+                <!-- Botones globales -->
+                <div class="calib-row" style="margin-top:auto">
+                    <button class="btn-calib danger" onclick="cerrarCalibracion()">✕ Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ══════════════════════════════════════════════════════
+        //  Variables de calibración
+        // ══════════════════════════════════════════════════════
+        let calibState    = 'idle';
+        let calibPreset   = 1;
+        let calibTotal    = 3;
+        let calibRoiPts   = [];
+        let calibAnclaRect = null;
+
+        // Estado de arrastre para el rectángulo de anclaje
+        let dragStart = null;
+        let isDragging = false;
+
+        // ── Abrir / cerrar panel ──────────────────────────────
+        function abrirCalibracion() {
+            document.getElementById('calib-overlay').classList.add('visible');
+            // Conectar stream de calibración al mismo feed lq
+            document.getElementById('calib-stream').src = '/video_feed/lq?t=' + Date.now();
+            // Arrancar si idle
+            fetch('/calibracion/estado').then(r => r.json()).then(est => {
+                actualizarUICalibracion(est);
+                if (est.state === 'idle') {
+                    // Mostrar botón de inicio
+                    calibLog('CALIB', 'Panel de calibración listo. Pulsa INICIAR para comenzar.');
+                    mostrarInicioCalib();
+                }
+            });
+        }
+
+        function cerrarCalibracion() {
+            calibCmd('cancelar');
+            document.getElementById('calib-overlay').classList.remove('visible');
+            document.getElementById('calib-stream').src = '';
+        }
+
+        function mostrarInicioCalib() {
+            ocultarTodosCtrl();
+            const ctrl = document.getElementById('ctrl-posicion');
+            // Sustituir temporalmente por botón de inicio
+            ctrl.style.display = 'flex';
+            ctrl.innerHTML = '<button class="btn-calib confirm" style="width:100%" onclick="iniciarCalibracion()">▶ INICIAR CALIBRACIÓN</button>';
+        }
+
+        function iniciarCalibracion() {
+            // Restaurar controles de posición
+            document.getElementById('ctrl-posicion').innerHTML = `
+                <div class="calib-row">
+                    <button class="btn-calib" onclick="calibCmd('mover_izq')" id="btn-izq">◀ A — Izquierda</button>
+                    <button class="btn-calib" onclick="calibCmd('mover_der')" id="btn-der">D — Derecha ▶</button>
+                </div>
+                <button class="btn-calib confirm" onclick="calibCmd('confirmar')">✔ CONFIRMAR POSICIÓN</button>`;
+            calibCmd('iniciar');
+        }
+
+        // ── Enviar comando al servidor ────────────────────────
+        function calibCmd(accion, extra) {
+            const payload = Object.assign({ accion }, extra || {});
+            fetch('/calibracion/cmd', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        }
+
+        // ── Actualizar UI según estado ────────────────────────
+        function ocultarTodosCtrl() {
+            ['ctrl-posicion','ctrl-roi','ctrl-ancla','ctrl-done'].forEach(id => {
+                document.getElementById(id).style.display = 'none';
+            });
+        }
+
+        const PHASE_LABELS = {
+            idle: 'Idle', posicion: 'Posición', roi: 'ROI',
+            ancla: 'Anclaje', done: 'Completado',
+        };
+        const PHASE_CLASSES = {
+            idle: 'phase-idle', posicion: 'phase-posicion',
+            roi: 'phase-roi', ancla: 'phase-ancla', done: 'phase-done',
+        };
+
+        function actualizarUICalibracion(est) {
+            calibState  = est.state || 'idle';
+            calibPreset = est.preset || 1;
+            calibTotal  = est.total || 3;
+            calibRoiPts = est.roi_puntos || [];
+
+            // Badge de fase
+            const badge = document.getElementById('calib-phase-badge');
+            badge.textContent = PHASE_LABELS[calibState] || calibState;
+            badge.className   = 'calib-phase-badge ' + (PHASE_CLASSES[calibState] || 'phase-idle');
+
+            // Progreso
+            document.getElementById('calib-progress').textContent =
+                calibState !== 'idle' ? `  Preset ${calibPreset} / ${calibTotal}` : '';
+
+            // Controles visibles
+            ocultarTodosCtrl();
+            if (calibState === 'posicion') document.getElementById('ctrl-posicion').style.display = 'flex';
+            if (calibState === 'roi')      document.getElementById('ctrl-roi').style.display = 'flex';
+            if (calibState === 'ancla')    document.getElementById('ctrl-ancla').style.display = 'flex';
+            if (calibState === 'done')     document.getElementById('ctrl-done').style.display = 'flex';
+
+            // Dibujar ROI en SVG
+            dibujarROI(calibRoiPts);
+        }
+
+        // ── Dibujar ROI ───────────────────────────────────────
+        function dibujarROI(pts) {
+            const svg = document.getElementById('calib-svg');
+            svg.innerHTML = '';
+            if (!pts || pts.length === 0) return;
+            const wrap = document.getElementById('calib-video-wrap');
+            const img  = document.getElementById('calib-stream');
+            const scX  = img.clientWidth  / 640;
+            const scY  = img.clientHeight / 360;
+
+            // Líneas
+            for (let i = 0; i < pts.length; i++) {
+                const a = pts[i], b = pts[(i + 1) % pts.length];
+                const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+                line.setAttribute('x1', a[0] * scX); line.setAttribute('y1', a[1] * scY);
+                line.setAttribute('x2', b[0] * scX); line.setAttribute('y2', b[1] * scY);
+                line.setAttribute('stroke', '#3fb950');
+                line.setAttribute('stroke-width', '2');
+                svg.appendChild(line);
+            }
+            // Puntos
+            pts.forEach((p, idx) => {
+                const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+                c.setAttribute('cx', p[0] * scX); c.setAttribute('cy', p[1] * scY);
+                c.setAttribute('r', 5); c.setAttribute('fill', '#3fb950');
+                svg.appendChild(c);
+            });
+        }
+
+        // ── Log de calibración ────────────────────────────────
+        function calibLog(nivel, texto) {
+            const box = document.getElementById('calib-log');
+            let cls = '';
+            if (nivel === 'CALIB') cls = 'inst';
+            else if (nivel === 'INFO' && texto.includes('✅')) cls = 'ok';
+            else if (nivel === 'ALARM') cls = 'err';
+            box.innerHTML += `<div class="${cls}">${texto}</div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // ── Interacción con el vídeo de calibración ───────────
+        const calibVideoWrap = document.getElementById('calib-video-wrap');
+        const calibDragRect  = document.getElementById('calib-drag-rect');
+
+        function videoCoords(e) {
+            const img  = document.getElementById('calib-stream');
+            const rect = img.getBoundingClientRect();
+            const x = Math.round((e.clientX - rect.left) / rect.width  * 640);
+            const y = Math.round((e.clientY - rect.top)  / rect.height * 360);
+            return [x, y];
+        }
+
+        calibVideoWrap.addEventListener('click', e => {
+            if (calibState === 'roi') {
+                const [x, y] = videoCoords(e);
+                calibCmd('roi_punto', { x, y });
+                // Dibujar localmente para respuesta inmediata
+                calibRoiPts.push([x, y]);
+                dibujarROI(calibRoiPts);
+                calibLog('CALIB', `📍 Punto ${calibRoiPts.length} añadido (${x}, ${y})`);
+            }
+        });
+
+        calibVideoWrap.addEventListener('mousedown', e => {
+            if (calibState === 'ancla') {
+                const img = document.getElementById('calib-stream');
+                const rect = img.getBoundingClientRect();
+                dragStart = { x: e.clientX - rect.left, y: e.clientY - rect.top, rect };
+                isDragging = true;
+                calibDragRect.style.left   = dragStart.x + 'px';
+                calibDragRect.style.top    = dragStart.y + 'px';
+                calibDragRect.style.width  = '0';
+                calibDragRect.style.height = '0';
+                calibDragRect.style.display = 'block';
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('mousemove', e => {
+            if (!isDragging || !dragStart) return;
+            const img = document.getElementById('calib-stream');
+            const rect = img.getBoundingClientRect();
+            const cx = e.clientX - rect.left;
+            const cy = e.clientY - rect.top;
+            const x  = Math.min(cx, dragStart.x);
+            const y  = Math.min(cy, dragStart.y);
+            const w  = Math.abs(cx - dragStart.x);
+            const h  = Math.abs(cy - dragStart.y);
+            calibDragRect.style.left   = x + 'px';
+            calibDragRect.style.top    = y + 'px';
+            calibDragRect.style.width  = w + 'px';
+            calibDragRect.style.height = h + 'px';
+        });
+
+        window.addEventListener('mouseup', e => {
+            if (!isDragging || calibState !== 'ancla') return;
+            isDragging = false;
+            calibDragRect.style.display = 'none';
+
+            const img = document.getElementById('calib-stream');
+            const rect = img.getBoundingClientRect();
+            const cx = e.clientX - rect.left;
+            const cy = e.clientY - rect.top;
+            const rx = Math.min(cx, dragStart.x) / rect.width  * 640;
+            const ry = Math.min(cy, dragStart.y) / rect.height * 360;
+            const rw = Math.abs(cx - dragStart.x) / rect.width  * 640;
+            const rh = Math.abs(cy - dragStart.y) / rect.height * 360;
+
+            if (rw > 5 && rh > 5) {
+                calibCmd('ancla_rect', {
+                    x: Math.round(rx), y: Math.round(ry),
+                    w: Math.round(rw), h: Math.round(rh),
+                });
+            }
+            dragStart = null;
+        });
+
+        // Teclas A/D dentro del panel de calibración
+        document.addEventListener('keydown', e => {
+            if (!document.getElementById('calib-overlay').classList.contains('visible')) return;
+            if (calibState === 'posicion') {
+                if (e.key === 'a' || e.key === 'A') { e.preventDefault(); calibCmd('mover_izq'); }
+                if (e.key === 'd' || e.key === 'D') { e.preventDefault(); calibCmd('mover_der'); }
+                if (e.key === 'Enter')               { e.preventDefault(); calibCmd('confirmar'); }
+            } else if (calibState === 'roi' || calibState === 'ancla') {
+                if (e.key === 'Enter') { e.preventDefault(); calibCmd('confirmar'); }
+            }
+        });
+
+        // ── Poll de estado de calibración cada 2 s ────────────
+        setInterval(() => {
+            if (!document.getElementById('calib-overlay').classList.contains('visible')) return;
+            fetch('/calibracion/estado').then(r => r.json()).then(actualizarUICalibracion).catch(() => {});
+        }, 2000);
+    </script>
+
 </body>
-</html>
