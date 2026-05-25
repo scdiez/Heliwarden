@@ -1,5 +1,5 @@
 """
-modulos/modulo_patrulla.py — Control PTZ y seguimiento de referencias.
+Modulos/modulo_patrulla.py — Control PTZ y seguimiento de referencias.
 
 Responsabilidades:
   - Mover la cámara PTZ a través de los presets configurados.
@@ -7,11 +7,13 @@ Responsabilidades:
   - Publicar resultado de cada preset en MQTT → heliwarden/patrulla
   - Escuchar comandos en MQTT → heliwarden/patrulla/cmd
 
+Control PTZ vía CGI HTTP nativo Foscam (SD4H).
+NO usa ONVIF.
 NO escribe en helipuertos.json directamente.
 NO envía correos.
 NO llama a YOLO (eso es modulo_deteccion.py).
 
-Corre como proceso independiente: `python modulos/modulo_patrulla.py`
+Corre como proceso independiente: python modulos/modulo_patrulla.py
 """
 
 import cv2
@@ -26,9 +28,8 @@ from pathlib import Path
 
 import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
-from onvif import ONVIFCamera
 
-# ── Paths basados en la ubicación de este archivo ─────────────────────────────
+# ── Paths ─────────────────────────────────────────────────────────────────────
 MODULOS_DIR = Path(__file__).resolve().parent
 ROOT_DIR    = MODULOS_DIR.parent
 sys.path.insert(0, str(MODULOS_DIR))
@@ -39,23 +40,21 @@ load_dotenv(ROOT_DIR / ".env")
 
 # ── Configuración ─────────────────────────────────────────────────────────────
 
-USER       = os.getenv("CAMERA_USER")
-PASS       = os.getenv("CAMERA_PASS")
-IP         = os.getenv("CAMERA_IP")
-ONVIF_PORT = int(os.getenv("CAMERA_ONVIF_PORT", 888))
-HTTP_PORT  = int(os.getenv("CAMERA_HTTP_PORT", 88))
+USER      = os.getenv("CAMERA_USER")
+PASS      = os.getenv("CAMERA_PASS")
+IP        = os.getenv("CAMERA_IP")
+HTTP_PORT = int(os.getenv("CAMERA_HTTP_PORT", 88))
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT   = int(os.getenv("MQTT_PORT", 1883))
 
 CALIB_DIR = ROOT_DIR / "calibracion"
 
-HTTP_SNAP_URL = (
-    f"http://{IP}:{HTTP_PORT}/cgi-bin/CGIProxy.fcgi"
-    f"?cmd=snapPicture2&usr={USER}&pwd={PASS}"
-)
+# Velocidad de movimiento continuo (1–9 en Foscam)
+PTZ_SPEED = int(os.getenv("PTZ_SPEED", 4))
 
-ONVIF_TIMEOUT = 5
+# Tiempo para barrer el eje X completo a velocidad máxima
+PTZ_HOME_LEFT = float(os.getenv("PTZ_HOME_LEFT", 15.0))
 
 TOPIC_ESTADO  = "heliwarden/patrulla"
 TOPIC_CMD     = "heliwarden/patrulla/cmd"
@@ -64,15 +63,82 @@ TOPIC_ACK     = "heliwarden/deteccion/ack"
 
 DETECCION_TIMEOUT = 90
 
+# ── CGI PTZ helper ────────────────────────────────────────────────────────────
+
+def _cgi(cmd: str, extra: dict = None, timeout: float = 4.0) -> requests.Response:
+    """Llama a la API CGI de la Foscam."""
+    params = {"cmd": cmd, "usr": USER, "pwd": PASS}
+    if extra:
+        params.update(extra)
+    url = f"http://{IP}:{HTTP_PORT}/cgi-bin/CGIProxy.fcgi"
+    return requests.get(url, params=params, timeout=timeout)
+
+
+def _snap_img() -> np.ndarray | None:
+    """Obtiene un frame vía HTTP snapshot y lo devuelve como ndarray BGR."""
+    try:
+        r = _cgi("snapPicture2", timeout=3)
+        if r.status_code != 200 or len(r.content) < 1000:
+            return None
+        arr = np.frombuffer(r.content, np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        return cv2.rotate(img, cv2.ROTATE_180) if img is not None else None
+    except Exception:
+        return None
+
+
+# Mapeo de dirección → comando CGI Foscam
+_DIR_CMD = {
+    "left":       "ptzMoveLeft",
+    "right":      "ptzMoveRight",
+    "up":         "ptzMoveUp",
+    "down":       "ptzMoveDown",
+    "stop":       "ptzStopRun",
+    "topleft":    "ptzMoveTopLeft",
+    "topright":   "ptzMoveTopRight",
+    "bottomleft": "ptzMoveBottomLeft",
+    "bottomright":"ptzMoveBottomRight",
+}
+
+
+def _ptz_move(direction: str, duration: float, speed: int = PTZ_SPEED) -> None:
+    """Mueve la cámara en `direction` durante `duration` segundos y la para."""
+    cmd = _DIR_CMD.get(direction)
+    if cmd is None:
+        print(f"[PTZ] Dirección desconocida: {direction}")
+        return
+    try:
+        _cgi(cmd, {"speed": speed})
+        time.sleep(duration)
+        _cgi("ptzStopRun")
+        time.sleep(0.3)
+    except Exception as e:
+        print(f"[PTZ] Error en movimiento '{direction}': {e}")
+
+
+def _ptz_preset(preset_id: int) -> bool:
+    """Mueve la cámara al preset guardado. Devuelve True si la respuesta es OK."""
+    try:
+        r = _cgi("ptzGotoPresetPoint", {"name": preset_id})
+        # Foscam devuelve XML con <result>0</result> si va bien
+        return r.status_code == 200 and "<result>0</result>" in r.text
+    except Exception as e:
+        print(f"[PTZ] Error yendo a preset {preset_id}: {e}")
+        return False
+
+
+def _ptz_home() -> None:
+    """Mueve la cámara al extremo izquierdo para sincronizar posición X."""
+    print("[PTZ] Sincronizando HOME (barrido izquierda)...")
+    _ptz_move("right", PTZ_HOME_LEFT, speed=9)
+    print("[PTZ] HOME alcanzado.")
+
 
 # ── Patrullero ────────────────────────────────────────────────────────────────
 
 class Patrullero:
     def __init__(self, mqtt_client: mqtt.Client):
         self.client = mqtt_client
-        self.mycam  = ONVIFCamera(IP, ONVIF_PORT, USER, PASS)
-        self.ptz    = self.mycam.create_ptz_service()
-        self.token  = self.mycam.create_media_service().GetProfiles()[0].token
 
         config_path = CALIB_DIR / "config.json"
         if not config_path.exists():
@@ -86,12 +152,11 @@ class Patrullero:
         self.patrulla_thread   = None
         self.stop_event        = threading.Event()
         self.indice_actual     = 0
-        self.reconectando      = False
         self.fallos_precision  = {}
         self.intentos_fallidos = {}
         self._ack_events: dict = {}
 
-    # ── Publicación MQTT ──────────────────────────────────────────────────────
+    # ── MQTT ──────────────────────────────────────────────────────────────────
 
     def _pub_estado(self, id_preset: int, ref_ok: bool, fallos: int, razon: str = "") -> None:
         payload = json.dumps({
@@ -111,71 +176,10 @@ class Patrullero:
         if ev is not None:
             ev.set()
 
-    # ── PTZ helpers ──────────────────────────────────────────────────────────
+    # ── Imagen ────────────────────────────────────────────────────────────────
 
-    def _llamada_ptz(self, fn, *args, timeout=ONVIF_TIMEOUT):
-        resultado = [None]
-        excepcion = [None]
-
-        def _run():
-            try:
-                resultado[0] = fn(*args)
-            except Exception as e:
-                excepcion[0] = e
-
-        t = threading.Thread(target=_run, daemon=True)
-        t.start()
-        t.join(timeout=timeout)
-        if t.is_alive():
-            raise TimeoutError(f"PTZ timeout tras {timeout}s")
-        if excepcion[0]:
-            raise excepcion[0]
-        return resultado[0]
-
-    def mover(self, vx: float, vy: float, t: float) -> None:
-        try:
-            req = self.ptz.create_type("ContinuousMove")
-            req.ProfileToken = self.token
-            req.Velocity = {"PanTilt": {"x": vx, "y": vy}}
-            self._llamada_ptz(self.ptz.ContinuousMove, req)
-            time.sleep(t)
-            req.Velocity = {"PanTilt": {"x": 0, "y": 0}}
-            self._llamada_ptz(self.ptz.ContinuousMove, req)
-            self._llamada_ptz(self.ptz.Stop, {"ProfileToken": self.token})
-            time.sleep(0.3)
-        except Exception as e:
-            err = str(e)
-            print(f"Error PTZ: {err}")
-            if "Profile Not Exist" in err or "Invalid" in err:
-                self._reconectar_onvif()
-
-    def _reconectar_onvif(self) -> None:
-        print("Renovando sesión ONVIF...")
-        try:
-            self.mycam = ONVIFCamera(IP, ONVIF_PORT, USER, PASS)
-            self.ptz   = self.mycam.create_ptz_service()
-            self.token = self.mycam.create_media_service().GetProfiles()[0].token
-            print("ONVIF renovado.")
-        except Exception as e:
-            print(f"Fallo ONVIF: {e}")
-
-    def ir_a_home(self) -> None:
-        print("Sincronizando HOME...")
-        self.mover(1.0, 0, 15.0)
-        self.mover(0, 1.0, 5.0)
-        self.last_p = 0
-
-    # ── Imagen HTTP ───────────────────────────────────────────────────────────
-
-    def get_img(self):
-        try:
-            r = requests.get(HTTP_SNAP_URL, timeout=2)
-            if r.status_code != 200:
-                return None
-            img = cv2.imdecode(np.frombuffer(r.content, np.uint8), cv2.IMREAD_COLOR)
-            return cv2.rotate(img, cv2.ROTATE_180)
-        except Exception:
-            return None
+    def get_img(self) -> np.ndarray | None:
+        return _snap_img()
 
     # ── Ajuste fino (template matching) ──────────────────────────────────────
 
@@ -187,6 +191,9 @@ class Patrullero:
 
         fallos_brutos = 0
         for i in range(40):
+            if self.stop_event.is_set():
+                return False, "STOP"
+
             img = self.get_img()
             if img is None:
                 recuperado = self._esperar_conexion()
@@ -197,7 +204,7 @@ class Patrullero:
             res = cv2.matchTemplate(img, plantilla, cv2.TM_CCOEFF_NORMED)
             _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
-            if max_val < 0.90:
+            if max_val < 0.92:
                 fallos_brutos += 1
                 if fallos_brutos >= 5:
                     return False, "PRECISION"
@@ -215,12 +222,13 @@ class Patrullero:
             if dist_x <= 20:
                 return True, "OK"
 
-            if dist_x > 300:   v_x, t_x = 0.05, 0.12
-            elif dist_x > 100: v_x, t_x = 0.04, 0.08
-            elif dist_x > 40:  v_x, t_x = 0.015, 0.05
-            else:               v_x, t_x = 0.008, 0.03
+            # Velocidad y duración proporcionales al error
+            if dist_x > 300:   speed, t_x = 4, 0.20
+            elif dist_x > 100: speed, t_x = 3, 0.12
+            elif dist_x > 40:  speed, t_x = 2, 0.07
+            else:               speed, t_x = 1, 0.04
 
-            self.mover((v_x if dx > 0 else -v_x), 0, t_x)
+            _ptz_move("right" if dx > 0 else "left", t_x, speed=speed)
             time.sleep(0.8)
 
         return False, "OSCILACION"
@@ -234,8 +242,19 @@ class Patrullero:
         id_preset = mision["id"]
         plantilla = cv2.imread(str(CALIB_DIR / f"ref_{id_preset}.png"))
         if plantilla is None:
+            print(f"[Patrulla] Sin imagen de referencia para preset {id_preset}")
             return False
 
+        # Ir al preset guardado en cámara
+        print(f"[Patrulla] → Preset {id_preset}")
+        ok = _ptz_preset(id_preset)
+        if not ok:
+            print(f"[Patrulla] ptzGotoPresetPoint falló para preset {id_preset}, intentando búsqueda manual...")
+
+        # Dar tiempo a que la cámara llegue
+        time.sleep(2.0)
+
+        # Verificar referencia visual
         encontrada = False
         pasos      = 0
         max_pasos  = 12
@@ -256,12 +275,13 @@ class Patrullero:
             _, max_val, _, _ = cv2.minMaxLoc(res)
             print(f"   Búsqueda P{id_preset} paso {pasos+1}/{max_pasos} | Match: {max_val:.2f}")
 
-            if max_val >= 0.90:
+            if max_val >= 0.92:
                 encontrada = True
                 break
 
-            direccion = -1.0 if id_preset > self.last_p else 1.0
-            self.mover(direccion, 0, 0.5)
+            # Búsqueda manual si el preset no fue suficiente
+            direccion = "left" if id_preset > self.last_p else "right"
+            _ptz_move(direccion, 1.2, speed=3)
             pasos += 1
             time.sleep(0.5)
 
@@ -290,9 +310,9 @@ class Patrullero:
                 del self._ack_events[id_preset]
 
                 if recibido:
-                    print(f"   ✅ ACK recibido para preset {id_preset}. Continuando patrulla.")
+                    print(f"   ✅ ACK recibido para preset {id_preset}.")
                 else:
-                    print(f"   ⚠️  Timeout esperando ACK del preset {id_preset} ({DETECCION_TIMEOUT}s). Continuando igualmente.")
+                    print(f"   ⚠️  Timeout ACK preset {id_preset} ({DETECCION_TIMEOUT}s). Continuando.")
             return True
         else:
             if self.stop_event.is_set():
@@ -308,57 +328,29 @@ class Patrullero:
                                  fallos=self.intentos_fallidos[id_preset], razon="OSCILACION")
             return False
 
-    # ── Espera de reconexión ──────────────────────────────────────────────────
+    # ── Espera reconexión ─────────────────────────────────────────────────────
 
     def _esperar_conexion(self) -> bool:
-        if self.reconectando:
-            return False
-        self.reconectando = True
-        print("CONEXIÓN PERDIDA — esperando...")
-
+        print("[Patrulla] CONEXIÓN PERDIDA — esperando...")
         while not self.stop_event.is_set():
-            img = self.get_img()
+            img = _snap_img()
             if img is not None:
-                onvif_ok = False
-                for intento in range(12):
-                    if self.stop_event.is_set():
-                        self.reconectando = False
-                        return False
-                    try:
-                        self.mycam = ONVIFCamera(IP, ONVIF_PORT, USER, PASS)
-                        self.ptz   = self.mycam.create_ptz_service()
-                        self.token = self.mycam.create_media_service().GetProfiles()[0].token
-                        onvif_ok   = True
-                        break
-                    except Exception as e:
-                        print(f"ONVIF no disponible (intento {intento+1}/12): {e}")
-                        time.sleep(5)
-
-                if not onvif_ok:
-                    continue
-
-                print("Conexión recuperada.")
-                self.ir_a_home()
-                self.reconectando = False
+                print("[Patrulla] Conexión recuperada.")
+                _ptz_home()
                 return True
-
             time.sleep(5)
-
-        self.reconectando = False
         return False
 
     # ── Bucle de patrulla ─────────────────────────────────────────────────────
 
     def _bucle_worker(self) -> None:
-        print("Iniciando patrulla...")
-
+        print("[Patrulla] Iniciando patrulla...")
         self.client.publish(
             "heliwarden/patrulla/reset",
             json.dumps({"accion": "reset"}),
             qos=1,
         )
-
-        self.ir_a_home()
+        _ptz_home()
 
         while not self.stop_event.is_set():
             for idx in range(self.indice_actual, len(self.config)):
@@ -368,20 +360,21 @@ class Patrullero:
                 self.ejecutar_mision(self.config[idx])
 
             self.indice_actual = 0
-            print("Ciclo completo. Reiniciando...")
+            print("[Patrulla] Ciclo completo. Reiniciando...")
 
     def iniciar_patrulla(self) -> None:
         if self.patrulla_thread is None or not self.patrulla_thread.is_alive():
             self.stop_event.clear()
             self.patrulla_thread = threading.Thread(target=self._bucle_worker, daemon=True)
             self.patrulla_thread.start()
-            print("Patrulla iniciada.")
+            print("[Patrulla] Patrulla iniciada.")
 
     def stop_patrulla(self) -> None:
         self.stop_event.set()
+        _cgi("ptzStopRun")
         if self.patrulla_thread:
             self.patrulla_thread.join(timeout=2.0)
-        print("Patrulla detenida.")
+        print("[Patrulla] Patrulla detenida.")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
