@@ -10,11 +10,11 @@ BASE_DIR = Path(__file__).parent
 CALIB_DIR = BASE_DIR 
 CONFIG_FILE = CALIB_DIR / "config.json"
 
-USER = os.getenv("CAMERA_USER", "urjato")
-PASS = os.getenv("CAMERA_PASS", "ABC123-")
-IP = os.getenv("CAMERA_IP", "192.168.0.207")
-ONVIF_PORT = int(os.getenv("CAMERA_ONVIF_PORT", 888))
-HTTP_PORT = int(os.getenv("CAMERA_HTTP_PORT", 88))
+USER = os.getenv("CAMERA_USER")
+PASS = os.getenv("CAMERA_PASS")
+IP = os.getenv("CAMERA_IP")
+ONVIF_PORT = int(os.getenv("CAMERA_ONVIF_PORT"))
+HTTP_PORT = int(os.getenv("CAMERA_HTTP_PORT"))
 
 HTTP_SNAP_URL = f"http://{IP}:{HTTP_PORT}/cgi-bin/CGIProxy.fcgi?cmd=snapPicture2&usr={USER}&pwd={PASS}"
 
