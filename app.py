@@ -27,7 +27,7 @@ _modulos_dir = str(ROOT_DIR / "Modulos")
 if _modulos_dir not in sys.path:
     sys.path.insert(0, _modulos_dir)
 
-from modulo_calibracion import Calibrador, STATE_IDLE  # type: ignore[import]
+from modulo_calibracion import Calibrador  # type: ignore[import]
 
 load_dotenv(ROOT_DIR / ".env")
 
@@ -263,9 +263,23 @@ def status():
 
 @app.route("/calibracion/cmd", methods=["POST"])
 def calibracion_cmd():
-    """Recibe comandos de calibración del frontend y los publica en MQTT."""
+    """Recibe comandos de calibración del frontend.
+    Llama al calibrador directamente (mismo proceso) para evitar la latencia
+    y la condición de carrera del rodeo MQTT → suscripción → callback.
+    También publica en MQTT por si hay otros suscriptores externos.
+    """
     from flask import request
     payload = request.get_json(force=True) or {}
+
+    # Llamada directa: garantiza que el comando se procesa de inmediato
+    if _calibrador is not None:
+        threading.Thread(
+            target=_calibrador.recibir_comando,
+            args=(payload,),
+            daemon=True,
+        ).start()
+
+    # Publicación MQTT secundaria (para trazabilidad / suscriptores externos)
     _mqtt_client.publish(
         "heliwarden/calibracion/cmd",
         json.dumps(payload),
@@ -286,6 +300,25 @@ def calibracion_estado():
         "roi_puntos": _calibrador.roi_puntos,
         "ancla_rect": _calibrador.ancla_rect,
     })
+
+
+@app.route("/calibracion/config_existe")
+def calibracion_config_existe():
+    """Indica si ya existe un config.json de calibración válido."""
+    config_path = ROOT_DIR / "calibracion" / "config.json"
+    existe = config_path.exists() and config_path.stat().st_size > 10
+    return jsonify({"existe": existe})
+
+
+@app.route("/calibracion/bloqueado")
+def calibracion_bloqueado():
+    """Indica si la calibración OpenCV está actualmente en curso.
+    El frontend lo consulta cada 3 s para pausar/reanudar refreshes.
+    """
+    if _calibrador is None:
+        return jsonify({"bloqueado": False})
+    bloqueado = _calibrador.state not in ("idle", "done")
+    return jsonify({"bloqueado": bloqueado})
 
 
 # ── Arranque ──────────────────────────────────────────────────────────────────

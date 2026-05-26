@@ -3,26 +3,26 @@
         "1": {
             "nombre": "H-01",
             "plataforma": {
-                "visibilidad": "Buena",
+                "visibilidad": "No analizado",
                 "estado": "Despejado",
                 "estacionamiento": "EC-034 (22/04/27 19:03)",
-                "rango": 2,
-                "ocupacion": "Despejado",
+                "rango": 1,
+                "ocupacion": "No analizado",
                 "detecciones": []
             },
             "rutas": {
                 "ruta_1": {
-                    "visibilidad": "Buena",
+                    "visibilidad": "No analizado",
                     "estado": "Despejado",
-                    "rango": 2,
-                    "ocupacion": "Despejado",
+                    "rango": 1,
+                    "ocupacion": "No analizado",
                     "detecciones": []
                 },
                 "ruta_2": {
-                    "visibilidad": "Buena",
+                    "visibilidad": "No analizado",
                     "estado": "Despejado",
-                    "rango": 2,
-                    "ocupacion": "Despejado",
+                    "rango": 1,
+                    "ocupacion": "No analizado",
                     "detecciones": []
                 }
             },
@@ -93,199 +93,139 @@
     },
     "logs": [
         {
-            "timestamp": "2026-05-25 12:09:19",
+            "timestamp": "2026-05-26 11:05:39",
             "nivel": "INFO",
             "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
         },
         {
-            "timestamp": "2026-05-25 12:10:06",
+            "timestamp": "2026-05-26 11:19:11",
             "nivel": "INFO",
-            "mensaje": "Visibilidad recuperada en Plataforma (H-1)"
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
         },
         {
-            "timestamp": "2026-05-25 12:10:06",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:10:23",
-            "nivel": "INFO",
-            "mensaje": "Visibilidad recuperada en Ruta 1 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:10:23",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:10:54",
-            "nivel": "INFO",
-            "mensaje": "Visibilidad recuperada en Ruta 2 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:10:54",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:11:17",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:11:36",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:12:15",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:13:04",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:13:33",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:14:15",
-            "nivel": "ALARM",
-            "mensaje": "FALLO P3 (PRECISION) — intento 1"
-        },
-        {
-            "timestamp": "2026-05-25 12:14:25",
+            "timestamp": "2026-05-26 11:19:35",
             "nivel": "ALARM",
             "mensaje": "FALLO P1 (PRECISION) — intento 1"
         },
         {
-            "timestamp": "2026-05-25 12:15:06",
-            "nivel": "ALARM",
-            "mensaje": "FALLO P2 (NO_REFERENCIA) — intento 1"
-        },
-        {
-            "timestamp": "2026-05-25 12:16:06",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:16:57",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:17:41",
-            "nivel": "ALARM",
-            "mensaje": "FALLO P2 (NO_REFERENCIA) — intento 2"
-        },
-        {
-            "timestamp": "2026-05-25 12:18:22",
-            "nivel": "ALARM",
-            "mensaje": "FALLO P3 (NO_REFERENCIA) — intento 1"
-        },
-        {
-            "timestamp": "2026-05-25 12:19:19",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:36:56",
+            "timestamp": "2026-05-26 11:20:50",
             "nivel": "INFO",
             "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
         },
         {
-            "timestamp": "2026-05-25 12:37:27",
-            "nivel": "INFO",
-            "mensaje": "Visibilidad recuperada en Plataforma (H-1)"
+            "timestamp": "2026-05-26 11:21:14",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P1 (PRECISION) — intento 1"
         },
         {
-            "timestamp": "2026-05-25 12:37:27",
+            "timestamp": "2026-05-26 11:23:57",
             "nivel": "INFO",
-            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
         },
         {
-            "timestamp": "2026-05-25 12:37:46",
-            "nivel": "INFO",
-            "mensaje": "Visibilidad recuperada en Ruta 1 (H-1)"
+            "timestamp": "2026-05-26 11:24:21",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P1 (PRECISION) — intento 1"
         },
         {
-            "timestamp": "2026-05-25 12:37:46",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+            "timestamp": "2026-05-26 11:25:54",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P2 (PRECISION) — intento 1"
         },
         {
-            "timestamp": "2026-05-25 12:38:19",
+            "timestamp": "2026-05-26 11:26:07",
             "nivel": "INFO",
             "mensaje": "Visibilidad recuperada en Ruta 2 (H-1)"
         },
         {
-            "timestamp": "2026-05-25 12:38:19",
+            "timestamp": "2026-05-26 11:26:07",
             "nivel": "INFO",
             "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
         },
         {
-            "timestamp": "2026-05-25 12:38:53",
+            "timestamp": "2026-05-26 11:26:21",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 11:26:21",
             "nivel": "INFO",
             "mensaje": "Fijado preset 1 — Plataforma (H-1)"
         },
         {
-            "timestamp": "2026-05-25 12:40:44",
+            "timestamp": "2026-05-26 11:27:04",
+            "nivel": "ALARM",
+            "mensaje": "Conexión perdida con la cámara"
+        },
+        {
+            "timestamp": "2026-05-26 11:27:09",
+            "nivel": "INFO",
+            "mensaje": "Conexión con la cámara recuperada"
+        },
+        {
+            "timestamp": "2026-05-26 11:27:48",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-26 11:28:13",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P1 (PRECISION) — intento 1"
+        },
+        {
+            "timestamp": "2026-05-26 11:28:21",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 11:28:21",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 11:28:35",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P3 (PRECISION) — intento 1"
+        },
+        {
+            "timestamp": "2026-05-26 11:28:53",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 11:28:53",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 11:30:28",
             "nivel": "ALARM",
             "mensaje": "FALLO P2 (OSCILACION) — intento 1"
         },
         {
-            "timestamp": "2026-05-25 12:42:10",
+            "timestamp": "2026-05-26 11:31:29",
             "nivel": "INFO",
-            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
         },
         {
-            "timestamp": "2026-05-25 12:42:49",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:43:14",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:43:38",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:44:32",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:45:31",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:46:08",
-            "nivel": "INFO",
-            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
-        },
-        {
-            "timestamp": "2026-05-25 12:48:01",
+            "timestamp": "2026-05-26 11:32:10",
             "nivel": "ALARM",
-            "mensaje": "FALLO P1 (OSCILACION) — intento 1"
+            "mensaje": "FALLO P1 (NO_REFERENCIA) — intento 1"
         },
         {
-            "timestamp": "2026-05-25 12:48:41",
+            "timestamp": "2026-05-26 11:32:34",
             "nivel": "ALARM",
             "mensaje": "FALLO P2 (NO_REFERENCIA) — intento 1"
         },
         {
-            "timestamp": "2026-05-25 12:49:22",
+            "timestamp": "2026-05-26 11:32:46",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-26 11:33:10",
             "nivel": "ALARM",
-            "mensaje": "FALLO P3 (NO_REFERENCIA) — intento 1"
+            "mensaje": "FALLO P1 (PRECISION) — intento 2"
         }
     ]
 }

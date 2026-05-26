@@ -1,16 +1,16 @@
 """
-modulo_calibracion.py — Calibración web-driven del sistema Heliwarden.
+modulo_calibracion.py — Calibración con ventana OpenCV nativa a pantalla completa.
 
 Responsabilidades:
-  - Mover la cámara PTZ vía CGI (igual que modulo_patrulla).
-  - Guiar al operador paso a paso publicando instrucciones en heliwarden/log.
-  - Recibir comandos del frontend vía MQTT → heliwarden/calibracion/cmd.
-  - Guardar config.json y ref_N.png en la carpeta 'calibracion/'.
-
-Fases por preset:
-  1. POSICION  — mover con A/D, confirmar con ENTER.
-  2. ROI       — clics en la imagen del frontend, confirmar con ENTER.
-  3. ANCLA     — selección de rectángulo en el frontend, confirmar con ENTER.
+  - Al recibir el comando 'iniciar', lanza una ventana OpenCV fullscreen en el
+    servidor (igual que el script config.py de referencia).
+  - Interacción directa: A/D para mover, clic para ROI, arrastre para anclaje,
+    ENTER para confirmar, ESC para cancelar.
+  - Coordenadas siempre en píxeles de la imagen real → sin errores de escala.
+  - Publica estado e instrucciones por MQTT igual que antes.
+  - Guarda config.json y ref_N.png en calibracion/.
+  - Mientras la ventana está abierta, publica heliwarden/calibracion/bloqueado
+    para que el frontend pause sus refreshes automáticos.
 
 Corre integrado en app.py (importado), NO como proceso independiente.
 """
@@ -24,14 +24,12 @@ import os
 import requests
 import threading
 import time
-from datetime import datetime
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-# El módulo vive en Modulos/; los datos se guardan en la raíz del proyecto
 _THIS_DIR = Path(__file__).resolve().parent
 ROOT_DIR  = _THIS_DIR.parent if _THIS_DIR.name == "Modulos" else _THIS_DIR
 CALIB_DIR = ROOT_DIR / "calibracion"
@@ -47,54 +45,102 @@ HTTP_PORT = int(os.getenv("CAMERA_HTTP_PORT", 88))
 CGI_BASE  = f"http://{IP}:{HTTP_PORT}/cgi-bin/CGIProxy.fcgi"
 SNAP_URL  = f"{CGI_BASE}?cmd=snapPicture2&usr={USER}&pwd={PASS}"
 
-NUM_PRESETS = 3          # Número de posiciones a calibrar
+NUM_PRESETS = 3
 
-# ── Estados de la máquina de calibración ─────────────────────────────────────
+# ── Colores BGR ───────────────────────────────────────────────────────────────
+COL_ROI    = (80, 220, 80)      # verde
+COL_ANCLA  = (40, 180, 255)     # naranja
+COL_TEXT   = (255, 255, 255)
+COL_SHADOW = (0, 0, 0)
+COL_INST   = (0, 200, 255)      # amarillo-cian para instrucciones
+
+# ── Estados ───────────────────────────────────────────────────────────────────
 STATE_IDLE     = "idle"
-STATE_POSICION = "posicion"   # Mover cámara
-STATE_ROI      = "roi"        # Dibujar polígono ROI
-STATE_ANCLA    = "ancla"      # Seleccionar rectángulo de referencia
+STATE_HOME     = "home"
+STATE_POSICION = "posicion"
+STATE_ROI      = "roi"
+STATE_ANCLA    = "ancla"
 STATE_DONE     = "done"
 
+WIN_NAME = "Heliwarden — Calibración (ESC para cancelar)"
+
+
+# ── Helpers de dibujado ───────────────────────────────────────────────────────
+
+def _text_shadow(img, texto, pos, escala=0.65, grosor=1, color=COL_TEXT):
+    """Texto con sombra para mejor legibilidad sobre cualquier fondo."""
+    x, y = pos
+    cv2.putText(img, texto, (x + 1, y + 1), cv2.FONT_HERSHEY_SIMPLEX,
+                escala, COL_SHADOW, grosor + 1, cv2.LINE_AA)
+    cv2.putText(img, texto, (x, y), cv2.FONT_HERSHEY_SIMPLEX,
+                escala, color, grosor, cv2.LINE_AA)
+
+
+def _barra_instruccion(img, texto, h_img):
+    """Barra semitransparente en la parte inferior con la instrucción actual."""
+    overlay = img.copy()
+    cv2.rectangle(overlay, (0, h_img - 50), (img.shape[1], h_img), (20, 20, 20), -1)
+    cv2.addWeighted(overlay, 0.75, img, 0.25, 0, img)
+    _text_shadow(img, texto, (12, h_img - 18), escala=0.60, color=COL_INST)
+
+
+def _barra_superior(img, texto_fase, preset_idx, num_presets):
+    """Barra superior con fase y progreso."""
+    overlay = img.copy()
+    cv2.rectangle(overlay, (0, 0), (img.shape[1], 38), (20, 20, 20), -1)
+    cv2.addWeighted(overlay, 0.75, img, 0.25, 0, img)
+    _text_shadow(img, texto_fase, (12, 26), escala=0.70, color=COL_TEXT)
+    prog = f"Preset {preset_idx + 1} / {num_presets}"
+    tw, _ = cv2.getTextSize(prog, cv2.FONT_HERSHEY_SIMPLEX, 0.60, 1)[0], None
+    _text_shadow(img, prog, (img.shape[1] - 160, 26), escala=0.60, color=(150, 200, 255))
+
+
+# ── Clase principal ───────────────────────────────────────────────────────────
 
 class Calibrador:
-    """Máquina de estados que guía la calibración de los presets."""
+    """
+    Cuando se llama a recibir_comando({'accion':'iniciar'}), lanza un hilo
+    que abre una ventana OpenCV a pantalla completa y guía al operador.
+    """
 
     def __init__(self, mqtt_client: mqtt.Client):
-        self.client    = mqtt_client
-        self._lock     = threading.Lock()
+        self.client  = mqtt_client
         self._thread: threading.Thread | None = None
+        self._lock   = threading.Lock()
 
-        # Estado interno
-        self.state     = STATE_IDLE
-        self.preset_idx = 0          # 0-based
-        self.curr_pan  = 0           # pasos de pan acumulados
-        self.misiones: list[dict] = []
-
-        # Datos de la fase ROI/ANCLA en curso
+        # Estado observable por app.py
+        self.state      = STATE_IDLE
+        self.preset_idx = 0
         self.roi_puntos: list[list[int]] = []
-        self.ancla_rect: list[int] = []   # [x, y, w, h]
+        self.ancla_rect: list[int] = []
+        self.misiones:   list[dict] = []
 
-        # Evento para sincronizar fases (el worker espera confirmación del frontend)
-        self._cmd_event  = threading.Event()
-        self._cmd_payload: dict = {}
+        # Variables internas de la ventana OpenCV (solo accedidas desde el hilo)
+        self._img_display: np.ndarray | None = None
+        self._roi_pts_tmp: list[list[int]]   = []
+        self._drag_start:  tuple | None      = None
+        self._drag_end:    tuple | None      = None
+        self._ancla_tmp:   list[int]         = []  # [x,y,w,h] en píxeles reales
+
+        # Semáforos entre callback de ratón y bucle principal del hilo
+        self._roi_nuevo_punto  = threading.Event()
+        self._ancla_definida   = threading.Event()
 
         CALIB_DIR.mkdir(parents=True, exist_ok=True)
 
-    # ── Publicar al log del frontend ──────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
+    # MQTT helpers
+    # ─────────────────────────────────────────────────────────────────────────
 
-    def _log(self, nivel: str, mensaje: str) -> None:
-        payload = json.dumps({"nivel": nivel, "mensaje": mensaje})
-        self.client.publish("heliwarden/log", payload, qos=1)
-        print(f"[calibracion] [{nivel}] {mensaje}")
+    def _log(self, nivel: str, msg: str) -> None:
+        self.client.publish("heliwarden/log",
+                            json.dumps({"nivel": nivel, "mensaje": msg}), qos=1)
+        print(f"[calib][{nivel}] {msg}")
 
     def _instruccion(self, texto: str) -> None:
-        """Publica como nivel especial CALIB para que el frontend lo resalte."""
-        payload = json.dumps({"nivel": "CALIB", "mensaje": texto})
-        self.client.publish("heliwarden/log", payload, qos=1)
-        print(f"[calibracion] [INST] {texto}")
-
-    # ── Notifica al frontend el estado actual ─────────────────────────────────
+        self.client.publish("heliwarden/log",
+                            json.dumps({"nivel": "CALIB", "mensaje": texto}), qos=1)
+        print(f"[calib][INST] {texto}")
 
     def _pub_estado(self, extra: dict | None = None) -> None:
         payload = {
@@ -102,16 +148,21 @@ class Calibrador:
             "preset":     self.preset_idx + 1,
             "total":      NUM_PRESETS,
             "roi_puntos": self.roi_puntos,
+            "ancla_rect": self.ancla_rect,
         }
         if extra:
             payload.update(extra)
-        self.client.publish(
-            "heliwarden/calibracion/estado",
-            json.dumps(payload),
-            qos=1,
-        )
+        self.client.publish("heliwarden/calibracion/estado",
+                            json.dumps(payload), qos=1)
 
-    # ── PTZ helpers (mismos comandos CGI que modulo_patrulla) ────────────────
+    def _pub_bloqueado(self, bloqueado: bool) -> None:
+        """Avisa al frontend de que debe pausar/reanudar sus refreshes."""
+        self.client.publish("heliwarden/calibracion/bloqueado",
+                            json.dumps({"bloqueado": bloqueado}), qos=1, retain=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # PTZ / Cámara
+    # ─────────────────────────────────────────────────────────────────────────
 
     def _cgi(self, cmd: str, extra: dict | None = None) -> None:
         params = {"cmd": cmd, "usr": USER, "pwd": PASS}
@@ -120,14 +171,10 @@ class Calibrador:
         try:
             requests.get(CGI_BASE, params=params, timeout=4)
         except Exception as e:
-            print(f"[calibracion] CGI error: {e}")
+            print(f"[calib] CGI error: {e}")
 
     def _mover(self, direction: str, duration: float, speed: int = 3) -> None:
-        dir_cmd = {
-            "left":  "ptzMoveLeft",
-            "right": "ptzMoveRight",
-        }
-        cmd = dir_cmd.get(direction)
+        cmd = {"left": "ptzMoveLeft", "right": "ptzMoveRight"}.get(direction)
         if not cmd:
             return
         self._cgi(cmd, {"speed": speed})
@@ -136,220 +183,305 @@ class Calibrador:
         time.sleep(0.4)
 
     def _home(self) -> None:
-        self._instruccion("Sincronizando posición HOME — barriendo hacia la derecha...")
+        self._instruccion("Sincronizando HOME — barriendo hacia la derecha (15 s)...")
         self._cgi("ptzMoveRight", {"speed": 9})
         time.sleep(15.0)
         self._cgi("ptzStopRun")
         time.sleep(1.0)
-        self.curr_pan = 0
-        self._instruccion("HOME alcanzado. ¡Listo para calibrar!")
+        self._curr_pan = 0
+        self._instruccion("HOME alcanzado.")
 
     def _snap(self) -> np.ndarray | None:
         try:
-            r = requests.get(SNAP_URL, timeout=5)
+            r   = requests.get(SNAP_URL, timeout=5)
             arr = np.frombuffer(r.content, np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             return cv2.rotate(img, cv2.ROTATE_180) if img is not None else None
         except Exception:
             return None
 
-    # ── Guardar preset en la cámara ───────────────────────────────────────────
-
     def _guardar_preset_camara(self, preset_id: int) -> None:
-        """Guarda la posición actual como preset en la cámara Foscam."""
         try:
-            r = requests.get(
-                CGI_BASE,
-                params={"cmd": "ptzAddPresetPoint", "name": preset_id,
-                        "usr": USER, "pwd": PASS},
-                timeout=4,
-            )
+            r  = requests.get(CGI_BASE, params={"cmd": "ptzAddPresetPoint",
+                                                "name": preset_id,
+                                                "usr": USER, "pwd": PASS}, timeout=4)
             ok = r.status_code == 200 and "<result>0</result>" in r.text
-            if ok:
-                self._log("INFO", f"Preset {preset_id} guardado en la cámara.")
-            else:
-                self._log("ALARM", f"No se pudo guardar preset {preset_id} en la cámara (resp: {r.text[:80]})")
+            self._log("INFO" if ok else "ALARM",
+                      f"Preset {preset_id} {'guardado' if ok else 'ERROR al guardar'} en cámara.")
         except Exception as e:
             self._log("ALARM", f"Error guardando preset {preset_id}: {e}")
 
-    # ── Procesar comando del frontend ─────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
+    # Ventana OpenCV — callbacks de ratón
+    # ─────────────────────────────────────────────────────────────────────────
 
-    def recibir_comando(self, payload: dict) -> None:
-        """Llamado desde el callback MQTT del hilo principal."""
-        accion = payload.get("accion")
+    def _mouse_roi(self, event, x, y, flags, param):
+        """Callback para la fase ROI: clic izquierdo añade punto."""
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self._roi_pts_tmp.append([x, y])
+            self._roi_nuevo_punto.set()
 
-        if accion == "iniciar" and self.state == STATE_IDLE:
-            self._arrancar()
-            return
+    def _mouse_ancla(self, event, x, y, flags, param):
+        """Callback para la fase ANCLAJE: arrastre define el rectángulo."""
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self._drag_start = (x, y)
+            self._drag_end   = (x, y)
+            self._ancla_definida.clear()
+        elif event == cv2.EVENT_MOUSEMOVE and self._drag_start:
+            self._drag_end = (x, y)
+        elif event == cv2.EVENT_LBUTTONUP and self._drag_start:
+            self._drag_end = (x, y)
+            x0 = min(self._drag_start[0], self._drag_end[0])
+            y0 = min(self._drag_start[1], self._drag_end[1])
+            w  = abs(self._drag_end[0] - self._drag_start[0])
+            h  = abs(self._drag_end[1] - self._drag_start[1])
+            if w > 5 and h > 5:
+                self._ancla_tmp = [x0, y0, w, h]
+                self._ancla_definida.set()
+            self._drag_start = None
 
-        if accion == "cancelar":
-            self._cancelar()
-            return
+    # ─────────────────────────────────────────────────────────────────────────
+    # Bucle de la ventana: refresca imagen y overlay continuamente
+    # ─────────────────────────────────────────────────────────────────────────
 
-        if self.state == STATE_POSICION:
-            if accion == "mover_izq":
-                self._mover("left", 0.5)
-                self.curr_pan -= 1
-                self._instruccion(
-                    f"◀ Movido a la izquierda. Pan actual: {self.curr_pan}. "
-                    f"Pulsa A (izq) / D (der) o CONFIRMAR cuando estés en posición."
-                )
-                self._pub_estado()
-            elif accion == "mover_der":
-                self._mover("right", 0.5)
-                self.curr_pan += 1
-                self._instruccion(
-                    f"▶ Movido a la derecha. Pan actual: {self.curr_pan}. "
-                    f"Pulsa A (izq) / D (der) o CONFIRMAR cuando estés en posición."
-                )
-                self._pub_estado()
-            elif accion == "confirmar":
-                self._cmd_payload = payload
-                self._cmd_event.set()
+    def _get_frame_display(self) -> np.ndarray | None:
+        """Obtiene un frame fresco y lo escala a pantalla completa."""
+        img = self._snap()
+        if img is None:
+            return None
+        # Escalar al tamaño de la ventana manteniendo aspecto
+        h_win, w_win = cv2.getWindowImageRect(WIN_NAME)[3], cv2.getWindowImageRect(WIN_NAME)[2]
+        if w_win <= 0 or h_win <= 0:
+            return img
+        h_img, w_img = img.shape[:2]
+        scale = min(w_win / w_img, h_win / h_img)
+        new_w, new_h = int(w_img * scale), int(h_img * scale)
+        resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        # Canvas negro del tamaño de la ventana
+        canvas = np.zeros((h_win, w_win, 3), dtype=np.uint8)
+        off_x  = (w_win - new_w) // 2
+        off_y  = (h_win - new_h) // 2
+        canvas[off_y:off_y + new_h, off_x:off_x + new_w] = resized
+        return canvas
 
-        elif self.state == STATE_ROI:
-            if accion == "roi_punto":
-                x, y = int(payload.get("x", 0)), int(payload.get("y", 0))
-                self.roi_puntos.append([x, y])
-                self._instruccion(
-                    f"📍 Punto {len(self.roi_puntos)} del ROI añadido ({x}, {y}). "
-                    f"Sigue haciendo clic o CONFIRMAR para cerrar el polígono."
-                )
-                self._pub_estado()
-            elif accion == "roi_deshacer":
-                if self.roi_puntos:
-                    self.roi_puntos.pop()
-                    self._instruccion(f"↩ Último punto eliminado. Quedan {len(self.roi_puntos)} puntos.")
-                    self._pub_estado()
-            elif accion == "confirmar":
-                if len(self.roi_puntos) < 3:
-                    self._instruccion("⚠️  Necesitas al menos 3 puntos para definir el ROI.")
-                else:
-                    self._cmd_payload = payload
-                    self._cmd_event.set()
+    # ─────────────────────────────────────────────────────────────────────────
+    # Fases de calibración (se ejecutan dentro del hilo worker)
+    # ─────────────────────────────────────────────────────────────────────────
 
-        elif self.state == STATE_ANCLA:
-            if accion == "ancla_rect":
-                self.ancla_rect = [
-                    int(payload.get("x", 0)), int(payload.get("y", 0)),
-                    int(payload.get("w", 0)), int(payload.get("h", 0)),
-                ]
-                self._instruccion(
-                    f"🔲 Rectángulo de anclaje definido: "
-                    f"({self.ancla_rect[0]}, {self.ancla_rect[1]}) "
-                    f"{self.ancla_rect[2]}×{self.ancla_rect[3]}px. "
-                    f"CONFIRMAR para guardar."
-                )
-                self._pub_estado({"ancla_rect": self.ancla_rect})
-            elif accion == "confirmar":
-                if not self.ancla_rect:
-                    self._instruccion("⚠️  Primero selecciona el rectángulo de anclaje (parasol).")
-                else:
-                    self._cmd_payload = payload
-                    self._cmd_event.set()
-
-    # ── Arranque y cancelación ────────────────────────────────────────────────
-
-    def _arrancar(self) -> None:
-        if self._thread and self._thread.is_alive():
-            return
-        self._thread = threading.Thread(target=self._worker, daemon=True)
-        self._thread.start()
-
-    def _cancelar(self) -> None:
-        self.state = STATE_IDLE
-        self._cmd_event.set()   # desbloquea el worker si estuviera esperando
-        self._log("INFO", "Calibración cancelada.")
+    def _fase_posicion(self, preset_id: int) -> bool:
+        """
+        Muestra el stream en vivo.
+        A/D mueven la cámara. ENTER confirma. ESC cancela.
+        Devuelve True si se confirmó, False si se canceló.
+        """
+        self.state = STATE_POSICION
         self._pub_estado()
+        instruccion = (f"[POSICIÓN {preset_id}/{NUM_PRESETS}]  "
+                       f"A=izquierda  D=derecha  ENTER=confirmar  ESC=cancelar")
+        self._instruccion(instruccion)
 
-    # ── Worker principal ──────────────────────────────────────────────────────
+        cv2.setMouseCallback(WIN_NAME, lambda *a: None)  # sin callback de ratón
 
-    def _esperar_confirmacion(self) -> bool:
-        """Bloquea hasta que llegue 'confirmar' o se cancele. Devuelve False si cancelado."""
-        self._cmd_event.clear()
-        self._cmd_event.wait()
-        if self.state == STATE_IDLE:   # cancelado externamente
-            return False
-        return True
+        while True:
+            img = self._snap()
+            if img is None:
+                time.sleep(0.3)
+                continue
+
+            # Dibujar overlay
+            frame = img.copy()
+            _barra_superior(frame, f"POSICIÓN {preset_id}", self.preset_idx, NUM_PRESETS)
+            _barra_instruccion(frame, instruccion, frame.shape[0])
+            cv2.imshow(WIN_NAME, frame)
+
+            key = cv2.waitKey(50) & 0xFF
+            if key == 27:           # ESC → cancelar
+                return False
+            elif key in (ord('a'), ord('A')):
+                self._mover("left", 0.5)
+                self._curr_pan -= 1
+            elif key in (ord('d'), ord('D')):
+                self._mover("right", 0.5)
+                self._curr_pan += 1
+            elif key == 13:         # ENTER → confirmar
+                return True
+
+    def _fase_roi(self, preset_id: int, img_ref: np.ndarray) -> bool:
+        """
+        Permite al operador hacer clic para definir el polígono ROI.
+        Z=deshacer, ENTER=confirmar, ESC=cancelar.
+        Coordenadas en píxeles REALES de img_ref (sin escala CSS).
+        Devuelve True si se confirmó.
+        """
+        self.state = STATE_ROI
+        self._roi_pts_tmp = []
+        self._pub_estado()
+        instruccion = (f"[ROI {preset_id}/{NUM_PRESETS}]  "
+                       f"CLIC=añadir punto  Z=deshacer  ENTER=confirmar (mín 3 pts)  ESC=cancelar")
+        self._instruccion(instruccion)
+
+        cv2.setMouseCallback(WIN_NAME, self._mouse_roi)
+
+        while True:
+            frame = img_ref.copy()
+            _barra_superior(frame, f"ROI {preset_id}", self.preset_idx, NUM_PRESETS)
+
+            # Dibujar polígono en curso
+            if len(self._roi_pts_tmp) > 0:
+                pts = np.array(self._roi_pts_tmp, dtype=np.int32)
+                cv2.polylines(frame, [pts], isClosed=False, color=COL_ROI, thickness=2)
+                if len(self._roi_pts_tmp) > 2:
+                    # Línea de cierre (preview)
+                    cv2.line(frame, tuple(self._roi_pts_tmp[-1]),
+                             tuple(self._roi_pts_tmp[0]), COL_ROI, 1)
+                for i, p in enumerate(self._roi_pts_tmp):
+                    cv2.circle(frame, tuple(p), 5, COL_ROI, -1)
+                    _text_shadow(frame, str(i + 1), (p[0] + 7, p[1] - 5),
+                                 escala=0.50, color=COL_ROI)
+
+            _barra_instruccion(frame, instruccion, frame.shape[0])
+            cv2.imshow(WIN_NAME, frame)
+
+            key = cv2.waitKey(30) & 0xFF
+            if key == 27:
+                return False
+            elif key in (ord('z'), ord('Z')):
+                if self._roi_pts_tmp:
+                    self._roi_pts_tmp.pop()
+                    self._instruccion(f"↩ Punto eliminado. Quedan {len(self._roi_pts_tmp)}.")
+            elif key == 13:
+                if len(self._roi_pts_tmp) < 3:
+                    self._instruccion("⚠️  Necesitas al menos 3 puntos.")
+                else:
+                    self.roi_puntos = [list(p) for p in self._roi_pts_tmp]
+                    self._pub_estado()
+                    return True
+
+    def _fase_ancla(self, preset_id: int, img_ref: np.ndarray) -> bool:
+        """
+        El operador arrastra un rectángulo sobre la imagen para definir el anclaje.
+        ENTER confirma, ESC cancela.
+        Coordenadas en píxeles REALES.
+        """
+        self.state = STATE_ANCLA
+        self._ancla_tmp = []
+        self._ancla_definida.clear()
+        self._drag_start = None
+        self._drag_end   = None
+        self._pub_estado()
+        instruccion = (f"[ANCLAJE {preset_id}/{NUM_PRESETS}]  "
+                       f"ARRASTRE=seleccionar referencia fija  ENTER=confirmar  ESC=cancelar")
+        self._instruccion(instruccion)
+
+        cv2.setMouseCallback(WIN_NAME, self._mouse_ancla)
+
+        while True:
+            frame = img_ref.copy()
+            _barra_superior(frame, f"ANCLAJE {preset_id}", self.preset_idx, NUM_PRESETS)
+
+            # Preview del arrastre en curso
+            if self._drag_start and self._drag_end:
+                x0 = min(self._drag_start[0], self._drag_end[0])
+                y0 = min(self._drag_start[1], self._drag_end[1])
+                x1 = max(self._drag_start[0], self._drag_end[0])
+                y1 = max(self._drag_start[1], self._drag_end[1])
+                cv2.rectangle(frame, (x0, y0), (x1, y1), COL_ANCLA, 2)
+
+            # Rectángulo confirmado
+            if self._ancla_tmp:
+                ax, ay, aw, ah = self._ancla_tmp
+                cv2.rectangle(frame, (ax, ay), (ax + aw, ay + ah), COL_ANCLA, 2)
+                _text_shadow(frame, "ANCLAJE", (ax + 4, ay - 8),
+                             escala=0.55, color=COL_ANCLA)
+
+            _barra_instruccion(frame, instruccion, frame.shape[0])
+            cv2.imshow(WIN_NAME, frame)
+
+            key = cv2.waitKey(30) & 0xFF
+            if key == 27:
+                return False
+            elif key == 13:
+                if not self._ancla_tmp:
+                    self._instruccion("⚠️  Primero selecciona el rectángulo de anclaje.")
+                else:
+                    self.ancla_rect = list(self._ancla_tmp)
+                    self._pub_estado({"ancla_rect": self.ancla_rect})
+                    return True
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Worker principal
+    # ─────────────────────────────────────────────────────────────────────────
 
     def _worker(self) -> None:
-        self.misiones.clear()
-        self.preset_idx = 0
+        self.misiones    = []
+        self.preset_idx  = 0
+        self._curr_pan   = 0
 
-        self._log("INFO", "═══ INICIO DE CALIBRACIÓN ═══")
-        self._instruccion(
-            "Calibración iniciada. Voy a sincronizar la posición HOME de la cámara."
-        )
+        self._pub_bloqueado(True)
+        self._log("INFO", "═══ INICIO DE CALIBRACIÓN (ventana OpenCV) ═══")
+
+        # Crear ventana fullscreen
+        cv2.namedWindow(WIN_NAME, cv2.WINDOW_NORMAL)
+        cv2.setWindowProperty(WIN_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+        # HOME
+        self.state = STATE_HOME
+        self._pub_estado()
+
+        # Mostrar pantalla de espera durante el HOME
+        img_wait = self._snap()
+        if img_wait is None:
+            img_wait = np.zeros((540, 960, 3), dtype=np.uint8)
+        _barra_instruccion(img_wait,
+                           "Sincronizando HOME — espera (~15 s)...", img_wait.shape[0])
+        cv2.imshow(WIN_NAME, img_wait)
+        cv2.waitKey(1)
 
         self._home()
 
         for i in range(NUM_PRESETS):
-            if self.state == STATE_IDLE:
-                return   # cancelado
-
             self.preset_idx = i
-            preset_id = i + 1   # IDs 1-based
+            preset_id       = i + 1
 
-            # ── FASE 1: POSICIÓN ─────────────────────────────────────────────
-            self.state = STATE_POSICION
-            self._pub_estado()
-            self._instruccion(
-                f"━━ POSICIÓN {preset_id}/{NUM_PRESETS} ━━  "
-                f"Usa los botones ◀ A  D ▶ del panel de calibración para apuntar la cámara. "
-                f"Pulsa CONFIRMAR cuando estés en posición."
-            )
-
-            if not self._esperar_confirmacion():
+            # ── POSICIÓN ──────────────────────────────────────────────────────
+            if not self._fase_posicion(preset_id):
+                self._cancelar()
                 return
 
-            pan_guardado = self.curr_pan
+            pan_guardado = self._curr_pan
             self._guardar_preset_camara(preset_id)
             self._log("INFO", f"✅ Posición {preset_id} confirmada (pan={pan_guardado}).")
 
-            # ── FASE 2: ROI ──────────────────────────────────────────────────
-            self.state = STATE_ROI
-            self.roi_puntos = []
-            self._pub_estado()
-            self._instruccion(
-                f"━━ ROI {preset_id}/{NUM_PRESETS} ━━  "
-                f"Haz clic sobre el vídeo para marcar el área de vigilancia (mínimo 3 puntos). "
-                f"Pulsa DESHACER para borrar el último punto. "
-                f"Pulsa CONFIRMAR cuando el polígono esté cerrado."
-            )
+            # Capturar imagen de referencia (se usa para ROI y ANCLAJE)
+            img_ref = self._snap()
+            if img_ref is None:
+                self._log("ALARM", f"No se pudo capturar imagen para preset {preset_id}. Abortando.")
+                self._cancelar()
+                return
 
-            if not self._esperar_confirmacion():
+            # ── ROI ───────────────────────────────────────────────────────────
+            if not self._fase_roi(preset_id, img_ref):
+                self._cancelar()
                 return
 
             roi_guardado = [list(p) for p in self.roi_puntos]
             self._log("INFO", f"✅ ROI {preset_id} confirmado ({len(roi_guardado)} puntos).")
 
-            # ── FASE 3: ANCLAJE ──────────────────────────────────────────────
-            self.state = STATE_ANCLA
-            self.ancla_rect = []
-            self._pub_estado()
-            self._instruccion(
-                f"━━ ANCLAJE {preset_id}/{NUM_PRESETS} ━━  "
-                f"Haz clic y arrastra sobre el vídeo para seleccionar la referencia fija "
-                f"(p. ej. el parasol o un elemento estático). "
-                f"Pulsa CONFIRMAR para guardar."
-            )
-
-            if not self._esperar_confirmacion():
+            # ── ANCLAJE ───────────────────────────────────────────────────────
+            if not self._fase_ancla(preset_id, img_ref):
+                self._cancelar()
                 return
 
-            x, y, w, h = self.ancla_rect
-            centro = [x + w // 2, y + h // 2]
+            ax, ay, aw, ah = self.ancla_rect
+            centro  = [ax + aw // 2, ay + ah // 2]
 
-            # Capturar imagen y recortar plantilla
-            img = self._snap()
-            plantilla = None
-            if img is not None:
-                plantilla = img[y:y + h, x:x + w]
-                ref_path = CALIB_DIR / f"ref_{preset_id}.png"
-                cv2.imwrite(str(ref_path), plantilla)
-                self._log("INFO", f"✅ Referencia guardada: {ref_path.name}")
-            else:
-                self._log("ALARM", f"⚠️  No se pudo capturar imagen para ref_{preset_id}.png")
+            # Recortar y guardar plantilla de referencia
+            plantilla = img_ref[ay:ay + ah, ax:ax + aw]
+            ref_path  = CALIB_DIR / f"ref_{preset_id}.png"
+            cv2.imwrite(str(ref_path), plantilla)
+            self._log("INFO", f"✅ Referencia guardada: {ref_path.name}  "
+                              f"(centro real: {centro[0]},{centro[1]})  "
+                              f"ROI: {len(roi_guardado)} pts")
 
             self.misiones.append({
                 "id":      preset_id,
@@ -358,26 +490,64 @@ class Calibrador:
                 "centro":  centro,
             })
 
-            self._log(
-                "INFO",
-                f"✅ Preset {preset_id} completado — pan={pan_guardado}, "
-                f"centro=({centro[0]}, {centro[1]}), ROI={len(roi_guardado)} puntos.",
-            )
-
         # ── Guardar config.json ───────────────────────────────────────────────
         config_path = CALIB_DIR / "config.json"
         with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(self.misiones, f, indent=4)
+            json.dump(self.misiones, f, indent=4, ensure_ascii=False)
 
         self.state = STATE_DONE
         self._pub_estado()
         self._log("INFO", "═══ CALIBRACIÓN COMPLETADA ═══  config.json guardado.")
-        self._instruccion(
-            "🎉 Calibración finalizada correctamente. "
-            "Puedes cerrar este panel e iniciar la patrulla."
-        )
+        self._instruccion("🎉 Calibración finalizada. Puedes iniciar la patrulla.")
 
-        # Volver a idle tras un momento
-        time.sleep(2)
+        # Mostrar pantalla de éxito 3 s
+        img_ok = self._snap() or np.zeros((540, 960, 3), dtype=np.uint8)
+        _barra_instruccion(img_ok, "✅ CALIBRACIÓN COMPLETADA — cerrando ventana...", img_ok.shape[0])
+        cv2.imshow(WIN_NAME, img_ok)
+        cv2.waitKey(3000)
+
+        cv2.destroyWindow(WIN_NAME)
+        self._pub_bloqueado(False)
+        time.sleep(1)
         self.state = STATE_IDLE
         self._pub_estado()
+
+    def _cancelar(self) -> None:
+        self._log("INFO", "Calibración cancelada.")
+        cv2.destroyWindow(WIN_NAME)
+        self.state = STATE_IDLE
+        self._pub_estado()
+        self._pub_bloqueado(False)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # API pública (llamada desde app.py)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def recibir_comando(self, payload: dict) -> None:
+        """
+        Solo se acepta 'iniciar' para lanzar el worker.
+        El resto de la interacción (A/D, clics, ENTER) ocurre
+        directamente en la ventana OpenCV, no por MQTT.
+        """
+        accion = payload.get("accion")
+
+        if accion == "iniciar":
+            if self._thread and self._thread.is_alive():
+                self._log("INFO", "La calibración ya está en curso.")
+                return
+            self._thread = threading.Thread(target=self._worker, daemon=True)
+            self._thread.start()
+
+        elif accion == "cancelar":
+            # Permite cancelar desde el botón web aunque la interacción
+            # sea local (presionando ESC en la ventana)
+            if self._thread and self._thread.is_alive():
+                # Señalamos el cierre destruyendo la ventana;
+                # el worker detectará el fallo en waitKey y saldrá.
+                try:
+                    cv2.destroyWindow(WIN_NAME)
+                except Exception:
+                    pass
+                self.state = STATE_IDLE
+                self._pub_estado()
+                self._pub_bloqueado(False)
