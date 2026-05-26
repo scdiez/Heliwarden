@@ -279,12 +279,12 @@ class Patrullero:
                 encontrada = True
                 break
 
-            # Búsqueda manual si el preset no fue suficiente.
-            # Paso corto (0.3 s a speed=2) equivalente al 0.5 s ONVIF original.
-            direccion = "left" if id_preset > self.last_p else "right"
-            _ptz_move(direccion, 0.3, speed=2)
-            pasos += 1
-            time.sleep(0.4)
+        direccion = "left" if id_preset > self.last_p else "right"
+        # El primer paso de toda la patrulla (last_p=0) usa un impulso mínimo
+        t_mov = 0.03 if self.last_p == 0 else 0.08
+        _ptz_move(direccion, t_mov, speed=1)
+        pasos += 1
+        time.sleep(0.3)
 
         if not encontrada:
             self.fallos_precision[id_preset] = self.fallos_precision.get(id_preset, 0) + 1
