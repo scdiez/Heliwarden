@@ -3,27 +3,62 @@
         "1": {
             "nombre": "H-01",
             "plataforma": {
-                "visibilidad": "No analizado",
+                "visibilidad": "Buena",
                 "estado": "Despejado",
                 "estacionamiento": "EC-034 (22/04/27 19:03)",
-                "rango": 1,
-                "ocupacion": "No analizado",
-                "detecciones": []
+                "rango": 4,
+                "ocupacion": "Obstáculo",
+                "detecciones": [
+                    {
+                        "clase": "unknown_object_candidate",
+                        "cx": 1156.0,
+                        "cy": 438.0
+                    },
+                    {
+                        "clase": "unknown_object_candidate",
+                        "cx": 1029.5,
+                        "cy": 355.0
+                    },
+                    {
+                        "clase": "unknown_object_candidate",
+                        "cx": 1257.5,
+                        "cy": 345.5
+                    },
+                    {
+                        "clase": "unknown_object_candidate",
+                        "cx": 1153.5,
+                        "cy": 201.0
+                    }
+                ],
+                "occupancy_status": "OCUPADO_OBJETO"
             },
             "rutas": {
                 "ruta_1": {
-                    "visibilidad": "No analizado",
+                    "visibilidad": "Buena",
                     "estado": "Despejado",
-                    "rango": 1,
-                    "ocupacion": "No analizado",
-                    "detecciones": []
+                    "rango": 4,
+                    "ocupacion": "Obstáculo",
+                    "detecciones": [
+                        {
+                            "clase": "unknown_object_candidate",
+                            "cx": 715.5,
+                            "cy": 370.0
+                        },
+                        {
+                            "clase": "unknown_object_candidate",
+                            "cx": 725.5,
+                            "cy": 200.0
+                        }
+                    ],
+                    "occupancy_status": "OCUPADO_OBJETO"
                 },
                 "ruta_2": {
-                    "visibilidad": "No analizado",
+                    "visibilidad": "Buena",
                     "estado": "Despejado",
-                    "rango": 1,
+                    "rango": 2,
                     "ocupacion": "No analizado",
-                    "detecciones": []
+                    "detecciones": [],
+                    "occupancy_status": "NO_ANALIZADO"
                 }
             },
             "infraestructura": [
@@ -53,7 +88,8 @@
                 "estacionamiento": "EC-032 (22/04/27 18:07)",
                 "rango": 1,
                 "detecciones": [],
-                "ocupacion": "No analizado"
+                "ocupacion": "No analizado",
+                "occupancy_status": "NO_ANALIZADO"
             },
             "rutas": {
                 "ruta_1": {
@@ -61,14 +97,16 @@
                     "estado": "No evaluable",
                     "rango": 1,
                     "detecciones": [],
-                    "ocupacion": "No analizado"
+                    "ocupacion": "No analizado",
+                    "occupancy_status": "NO_ANALIZADO"
                 },
                 "ruta_2": {
                     "visibilidad": "No analizado",
                     "estado": "Despejada",
                     "rango": 1,
                     "detecciones": [],
-                    "ocupacion": "No analizado"
+                    "ocupacion": "No analizado",
+                    "occupancy_status": "NO_ANALIZADO"
                 }
             },
             "infraestructura": [
@@ -91,5 +129,201 @@
             "visibilidad_metrica": "2000m"
         }
     },
-    "logs": []
+    "logs": [
+        {
+            "timestamp": "2026-05-26 13:17:24",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-26 13:17:49",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P1 (PRECISION) — intento 1"
+        },
+        {
+            "timestamp": "2026-05-26 13:18:26",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 13:18:26",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 13:20:09",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 13:20:09",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 13:21:52",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-26 13:22:17",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P1 (PRECISION) — intento 1"
+        },
+        {
+            "timestamp": "2026-05-26 14:01:34",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-26 14:01:59",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P1 (PRECISION) — intento 1"
+        },
+        {
+            "timestamp": "2026-05-26 14:02:08",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:02:08",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:02:17",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Ruta 1 (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-26 14:02:52",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:02:52",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:35:40",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-26 14:36:07",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:36:07",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:36:18",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Plataforma (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-26 14:36:35",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:36:35",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:36:47",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Ruta 1 (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-26 14:37:21",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:37:21",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:37:31",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Ruta 2 (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-26 14:39:51",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-26 14:40:15",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P1 (PRECISION) — intento 1"
+        },
+        {
+            "timestamp": "2026-05-26 14:41:46",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P2 (OSCILACION) — intento 1"
+        },
+        {
+            "timestamp": "2026-05-26 14:42:17",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:42:17",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:45:28",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-26 14:45:54",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:45:54",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:46:03",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Plataforma (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-26 14:46:33",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:46:33",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:46:42",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Ruta 1 (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-26 14:47:31",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-26 14:47:31",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        }
+    ]
 }
