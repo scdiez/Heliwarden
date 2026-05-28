@@ -6,59 +6,27 @@
                 "visibilidad": "Buena",
                 "estado": "Despejado",
                 "estacionamiento": "EC-034 (22/04/27 19:03)",
-                "rango": 4,
-                "ocupacion": "Obstáculo",
-                "detecciones": [
-                    {
-                        "clase": "unknown_object_candidate",
-                        "cx": 1156.0,
-                        "cy": 438.0
-                    },
-                    {
-                        "clase": "unknown_object_candidate",
-                        "cx": 1029.5,
-                        "cy": 355.0
-                    },
-                    {
-                        "clase": "unknown_object_candidate",
-                        "cx": 1257.5,
-                        "cy": 345.5
-                    },
-                    {
-                        "clase": "unknown_object_candidate",
-                        "cx": 1153.5,
-                        "cy": 201.0
-                    }
-                ],
-                "occupancy_status": "OCUPADO_OBJETO"
+                "rango": 2,
+                "ocupacion": "Despejado",
+                "detecciones": [],
+                "occupancy_status": "LIBRE"
             },
             "rutas": {
                 "ruta_1": {
                     "visibilidad": "Buena",
                     "estado": "Despejado",
-                    "rango": 4,
-                    "ocupacion": "Obstáculo",
-                    "detecciones": [
-                        {
-                            "clase": "unknown_object_candidate",
-                            "cx": 715.5,
-                            "cy": 370.0
-                        },
-                        {
-                            "clase": "unknown_object_candidate",
-                            "cx": 725.5,
-                            "cy": 200.0
-                        }
-                    ],
-                    "occupancy_status": "OCUPADO_OBJETO"
+                    "rango": 2,
+                    "ocupacion": "Despejado",
+                    "detecciones": [],
+                    "occupancy_status": "LIBRE"
                 },
                 "ruta_2": {
                     "visibilidad": "Buena",
                     "estado": "Despejado",
                     "rango": 2,
-                    "ocupacion": "No analizado",
+                    "ocupacion": "Despejado",
                     "detecciones": [],
-                    "occupancy_status": "NO_ANALIZADO"
+                    "occupancy_status": "LIBRE"
                 }
             },
             "infraestructura": [
@@ -322,6 +290,406 @@
         },
         {
             "timestamp": "2026-05-26 14:47:31",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 08:43:00",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-28 08:57:44",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-28 08:58:22",
+            "nivel": "ALARM",
+            "mensaje": "FALLO P1 (NO_REFERENCIA) — intento 1"
+        },
+        {
+            "timestamp": "2026-05-28 09:00:01",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-28 09:19:37",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-28 09:19:41",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:19:41",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:19:52",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Plataforma (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-28 09:19:57",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:19:57",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:20:08",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Ruta 1 (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-28 09:20:13",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:20:13",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:20:23",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Ruta 2 (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-28 09:20:33",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:20:50",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:21:19",
+            "nivel": "INFO",
+            "mensaje": "Zona despejada: Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:21:24",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:21:48",
+            "nivel": "INFO",
+            "mensaje": "Zona despejada: Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:21:58",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:22:19",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:22:39",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:23:02",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:23:19",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:23:40",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:24:06",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:24:28",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:24:48",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:25:10",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:25:29",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:25:50",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:26:53",
+            "nivel": "INFO",
+            "mensaje": "Patrulla iniciada — estados reseteados a 'No analizado'"
+        },
+        {
+            "timestamp": "2026-05-28 09:27:00",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:27:00",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:27:12",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Plataforma (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-28 09:27:17",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:27:17",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:27:37",
+            "nivel": "INFO",
+            "mensaje": "Visibilidad recuperada en Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:27:37",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:28:03",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:28:15",
+            "nivel": "INFO",
+            "mensaje": "Zona despejada: Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:28:20",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:28:39",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:29:09",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:29:29",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:29:49",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:30:17",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:30:29",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Plataforma (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-28 09:30:34",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:30:52",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:31:20",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:31:33",
+            "nivel": "INFO",
+            "mensaje": "Zona despejada: Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:31:37",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:31:56",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:32:23",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:32:41",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:32:59",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:33:27",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:33:39",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Plataforma (H-1): pencil, pen"
+        },
+        {
+            "timestamp": "2026-05-28 09:33:44",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:34:07",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:34:37",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:34:55",
+            "nivel": "INFO",
+            "mensaje": "Zona despejada: Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:35:00",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:35:17",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Ruta 1 (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-28 09:35:22",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:35:40",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Ruta 2 (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-28 09:35:53",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:36:13",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:36:32",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:36:58",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:37:09",
+            "nivel": "ALARM",
+            "mensaje": "¡ALERTA! Obstáculo en Plataforma (H-1): unknown_object_candidate"
+        },
+        {
+            "timestamp": "2026-05-28 09:37:14",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:37:26",
+            "nivel": "INFO",
+            "mensaje": "Zona despejada: Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:37:31",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:37:45",
+            "nivel": "INFO",
+            "mensaje": "Zona despejada: Ruta 2 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:37:59",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 1 — Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:38:08",
+            "nivel": "INFO",
+            "mensaje": "Zona despejada: Plataforma (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:38:13",
+            "nivel": "INFO",
+            "mensaje": "Fijado preset 2 — Ruta 1 (H-1)"
+        },
+        {
+            "timestamp": "2026-05-28 09:38:30",
             "nivel": "INFO",
             "mensaje": "Fijado preset 3 — Ruta 2 (H-1)"
         }

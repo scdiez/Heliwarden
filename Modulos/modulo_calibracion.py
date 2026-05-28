@@ -4,8 +4,8 @@ modulo_calibracion.py — Calibracion con ventana OpenCV nativa a pantalla compl
 Responsabilidades:
   - Al recibir el comando 'iniciar', lanza una ventana OpenCV fullscreen en el
     servidor (igual que el script config.py de referencia).
-  - Interaccion directa: A/D para mover, clic para ROI, arrastre para anclaje,
-    ENTER para confirmar, ESC para cancelar.
+  - Interaccion directa: A/D para mover horizontal, W/S para mover vertical,
+    clic para ROI, arrastre para anclaje, ENTER para confirmar, ESC para cancelar.
   - Coordenadas siempre en pixeles de la imagen real -> sin errores de escala.
   - Publica estado e instrucciones por MQTT igual que antes.
   - Guarda config.json y ref_N.png en calibracion/.
@@ -171,7 +171,15 @@ class Calibrador:
             print(f"[calib] CGI error: {e}")
 
     def _mover(self, direction: str, duration: float, speed: int = 3) -> None:
-        cmd = {"left": "ptzMoveLeft", "right": "ptzMoveRight"}.get(direction)
+        """Mueve la cámara en la dirección indicada durante `duration` segundos.
+        Soporta: left, right, up, down.
+        """
+        cmd = {
+            "left":  "ptzMoveLeft",
+            "right": "ptzMoveRight",
+            "up":    "ptzMoveUp",
+            "down":  "ptzMoveDown",
+        }.get(direction)
         if not cmd:
             return
         self._cgi(cmd, {"speed": speed})
@@ -244,13 +252,17 @@ class Calibrador:
     def _fase_posicion(self, preset_id: int) -> bool:
         """
         Muestra el stream en vivo.
-        A/D mueven la camara. ENTER confirma. ESC cancela.
+        A/D mueven la camara horizontalmente.
+        W/S mueven la camara verticalmente.
+        ENTER confirma. ESC cancela.
         Devuelve True si se confirmo, False si se cancelo.
         """
         self.state = STATE_POSICION
         self._pub_estado()
-        instruccion = (f"[POSICION {preset_id}/{NUM_PRESETS}]  "
-                       f"A=izquierda  D=derecha  ENTER=confirmar  ESC=cancelar")
+        instruccion = (
+            f"[POSICION {preset_id}/{NUM_PRESETS}]  "
+            f"A/D=izq/der  W/S=arriba/abajo  ENTER=confirmar  ESC=cancelar"
+        )
         self._instruccion(instruccion)
 
         cv2.setMouseCallback(WIN_NAME, lambda *a: None)
@@ -267,15 +279,19 @@ class Calibrador:
             cv2.imshow(WIN_NAME, frame)
 
             key = cv2.waitKey(50) & 0xFF
-            if key == 27:
+            if key == 27:                          # ESC → cancelar
                 return False
-            elif key in (ord('a'), ord('A')):
+            elif key in (ord('a'), ord('A')):      # izquierda
                 self._mover("left", 0.5)
                 self._curr_pan -= 1
-            elif key in (ord('d'), ord('D')):
+            elif key in (ord('d'), ord('D')):      # derecha
                 self._mover("right", 0.5)
                 self._curr_pan += 1
-            elif key == 13:
+            elif key in (ord('w'), ord('W')):      # arriba
+                self._mover("up", 0.1)
+            elif key in (ord('s'), ord('S')):      # abajo
+                self._mover("down", 0.1)
+            elif key == 13:                        # ENTER → confirmar
                 return True
 
     def _fase_roi(self, preset_id: int, img_ref: np.ndarray) -> bool:
@@ -488,7 +504,7 @@ class Calibrador:
     def recibir_comando(self, payload: dict) -> None:
         """
         Solo se acepta 'iniciar' para lanzar el worker.
-        El resto de la interaccion (A/D, clics, ENTER) ocurre
+        El resto de la interaccion (A/D/W/S, clics, ENTER) ocurre
         directamente en la ventana OpenCV, no por MQTT.
         """
         accion = payload.get("accion")

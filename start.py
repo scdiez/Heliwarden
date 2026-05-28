@@ -12,6 +12,7 @@ Orden de arranque:
 Uso:
   python start.py             → arranca todo
   python start.py --sin-yolo  → arranca todo excepto modulo_deteccion
+  python start.py --forzar    → mata procesos anteriores y arranca de nuevo
   Ctrl+C                      → para todos los procesos
 """
 
@@ -22,6 +23,7 @@ import time
 import os
 import signal
 import socket
+import atexit
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -34,6 +36,83 @@ MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT   = int(os.getenv("MQTT_PORT", 1883))
 
 ESPERA_ENTRE_PROCESOS = 2
+
+# ── Lockfile para prevenir instancias duplicadas ───────────────────────────────
+# El lockfile guarda el PID del proceso start.py activo.
+# Si existe y el proceso sigue vivo → error (a menos que se use --forzar).
+
+LOCKFILE = ROOT_DIR / ".heliwarden.pid"
+
+
+def _pid_vivo(pid: int) -> bool:
+    """Devuelve True si el proceso con ese PID está vivo."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except (ProcessLookupError, PermissionError):
+        return False
+
+
+def _leer_lockfile() -> int | None:
+    """Devuelve el PID guardado en el lockfile, o None si no existe / es inválido."""
+    try:
+        return int(LOCKFILE.read_text().strip())
+    except Exception:
+        return None
+
+
+def _escribir_lockfile() -> None:
+    LOCKFILE.write_text(str(os.getpid()))
+    atexit.register(_borrar_lockfile)
+
+
+def _borrar_lockfile() -> None:
+    try:
+        LOCKFILE.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _comprobar_instancia_duplicada(forzar: bool) -> None:
+    """
+    Si hay un start.py anterior vivo:
+      - Con --forzar: lo mata y continúa.
+      - Sin --forzar: muestra error y sale.
+    """
+    pid_anterior = _leer_lockfile()
+    if pid_anterior is None:
+        return  # no hay lockfile o es inválido → arranque limpio
+
+    if not _pid_vivo(pid_anterior):
+        # El PID guardado ya no existe → lockfile obsoleto, lo ignoramos
+        LOCKFILE.unlink(missing_ok=True)
+        return
+
+    if forzar:
+        print(f"  ⚠️  Heliwarden ya estaba corriendo (PID {pid_anterior}). "
+              f"--forzar activo: matando proceso anterior...")
+        try:
+            os.kill(pid_anterior, signal.SIGTERM)
+            time.sleep(2)
+            if _pid_vivo(pid_anterior):
+                os.kill(pid_anterior, signal.SIGKILL)
+        except Exception as e:
+            print(f"  ⚠️  No se pudo matar PID {pid_anterior}: {e}")
+        LOCKFILE.unlink(missing_ok=True)
+        time.sleep(1)
+    else:
+        print(f"\n{'='*55}")
+        print(f"  ❌  Heliwarden ya está corriendo (PID {pid_anterior}).")
+        print(f"")
+        print(f"  Si el sistema anterior se quedó colgado, usa:")
+        print(f"    python start.py --forzar")
+        print(f"")
+        print(f"  O mata el proceso manualmente:")
+        print(f"    kill {pid_anterior}   (Linux/Mac)")
+        print(f"    taskkill /PID {pid_anterior} /F   (Windows)")
+        print(f"{'='*55}\n")
+        sys.exit(1)
+
 
 procesos: list[subprocess.Popen] = []
 
@@ -58,7 +137,6 @@ def _broker_responde(host: str, port: int) -> bool:
 def _arrancar_mosquitto() -> subprocess.Popen | None:
     """Solo intenta arrancar Mosquitto si el broker configurado es localhost."""
     if MQTT_BROKER not in ("localhost", "127.0.0.1"):
-        # Broker remoto — no intentamos arrancar nada local
         if _broker_responde(MQTT_BROKER, MQTT_PORT):
             print(f"  ✅ Broker MQTT remoto disponible en {MQTT_BROKER}:{MQTT_PORT}")
         else:
@@ -66,7 +144,6 @@ def _arrancar_mosquitto() -> subprocess.Popen | None:
             print(f"     Comprueba que el broker está activo y accesible.")
         return None
 
-    # Broker local — comportamiento original
     if _broker_responde("localhost", MQTT_PORT):
         print(f"  ✅ Mosquitto ya está corriendo en localhost:{MQTT_PORT}")
         return None
@@ -108,6 +185,7 @@ def _parar_todo(signum=None, frame=None):
             p.wait(timeout=5)
         except Exception:
             p.kill()
+    _borrar_lockfile()
     print("Sistema detenido.")
     sys.exit(0)
 
@@ -116,13 +194,20 @@ def main():
     parser = argparse.ArgumentParser(description="Arrancador de Heliwarden")
     parser.add_argument("--sin-yolo", action="store_true",
                         help="No arrancar modulo_deteccion")
+    parser.add_argument("--forzar", action="store_true",
+                        help="Matar instancia anterior si existe y arrancar de nuevo")
     args = parser.parse_args()
+
+    # ── Protección contra instancias duplicadas ───────────────────────────────
+    _comprobar_instancia_duplicada(forzar=args.forzar)
+    _escribir_lockfile()
 
     signal.signal(signal.SIGINT,  _parar_todo)
     signal.signal(signal.SIGTERM, _parar_todo)
 
     print("=" * 55)
     print("  HELIWARDEN — Arranque del sistema")
+    print(f"  PID: {os.getpid()}")
     print("=" * 55)
 
     _arrancar_mosquitto()
